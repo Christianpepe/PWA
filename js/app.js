@@ -65,16 +65,13 @@ async function loadDashboardStats() {
     try {
         console.log('📊 Cargando estadísticas...');
         
-        // Simular delay de red
-        await delay(500);
+        // Inicializar DB si no está lista
+        if (!window.DB) {
+            await delay(500);
+        }
         
-        // Datos simulados
-        const stats = {
-            totalProducts: 127,
-            totalStock: 3450,
-            lowStock: 8,
-            todayMovements: 15
-        };
+        // Obtener estadísticas reales de IndexedDB
+        const stats = await window.DB.getStats();
         
         appState.stats = stats;
         updateStatsUI(stats);
@@ -82,7 +79,7 @@ async function loadDashboardStats() {
         console.log('✅ Estadísticas cargadas:', stats);
         
     } catch (error) {
-        console.error('❌ Error cargando stats:', error);
+        console.error('Error al cargar estadísticas:', error);
     }
 }
 

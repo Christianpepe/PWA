@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Gestión de productos SafeProducts">
+    <meta name="theme-color" content="#2563eb">
+    
+    <title>Productos - SafeProducts</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192x192.png">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/productos.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container header-content">
+            <a href="home.html" class="btn-back">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <h1>Productos</h1>
+            <button class="btn-icon" id="btnAddProduct">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            
+            <!-- Filtros y Búsqueda -->
+            <section class="search-section">
+                <div class="search-box">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Buscar por nombre, descripción o código QR..."
+                    >
+                </div>
+                
+                <div class="filter-group">
+                    <label for="filterCategory">Categoría:</label>
+                    <select id="filterCategory">
+                        <option value="">Todas las categorías</option>
+                    </select>
+                </div>
+            </section>
+
+            <!-- Lista de Productos -->
+            <section class="products-section">
+                <div class="section-header">
+                    <h2>Inventario</h2>
+                    <span id="productCount" class="count-badge">0 productos</span>
+                </div>
+                
+                <div id="productsList" class="products-grid">
+                    <!-- Productos se cargarán dinámicamente -->
+                </div>
+                
+                <!-- Empty State -->
+                <div id="emptyState" class="empty-state hidden">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                    </svg>
+                    <h3>No hay productos</h3>
+                    <p>Agrega tu primer producto para comenzar</p>
+                    <button class="btn-primary" onclick="openAddModal()">
+                        Agregar Producto
+                    </button>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Modal: Agregar/Editar Producto -->
+    <div id="productModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Agregar Producto</h3>
+                <button class="btn-icon" onclick="closeModal()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="productForm" class="modal-body">
+                <input type="hidden" id="productId">
+                
+                <div class="form-group">
+                    <label for="productName">Nombre del Producto *</label>
+                    <input 
+                        type="text" 
+                        id="productName" 
+                        required 
+                        placeholder="Ej: Laptop HP"
+                        maxlength="100"
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="productDescription">Descripción</label>
+                    <textarea 
+                        id="productDescription" 
+                        rows="3" 
+                        placeholder="Detalles del producto..."
+                        maxlength="500"
+                    ></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="productPrice">Precio *</label>
+                        <input 
+                            type="number" 
+                            id="productPrice" 
+                            required 
+                            min="0" 
+                            step="0.01"
+                            placeholder="0.00"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="productQuantity">Cantidad *</label>
+                        <input 
+                            type="number" 
+                            id="productQuantity" 
+                            required 
+                            min="0"
+                            placeholder="0"
+                        >
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="productCategory">Categoría *</label>
+                    <select id="productCategory" required>
+                        <option value="">Selecciona una categoría</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="productQR">Código QR</label>
+                    <input 
+                        type="text" 
+                        id="productQR" 
+                        readonly 
+                        placeholder="Se generará automáticamente"
+                    >
+                    <small>Se generará un código único automáticamente</small>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn-primary" id="btnSave">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Ver Detalles -->
+    <div id="detailsModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Detalles del Producto</h3>
+                <button class="btn-icon" onclick="closeDetailsModal()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="product-details">
+                    <div class="qr-container" id="qrContainer">
+                        <!-- QR se generará aquí -->
+                    </div>
+                    
+                    <div class="details-info">
+                        <h4 id="detailName"></h4>
+                        <p id="detailDescription"></p>
+                        
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Precio:</span>
+                                <span class="detail-value" id="detailPrice"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Stock:</span>
+                                <span class="detail-value" id="detailQuantity"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Categoría:</span>
+                                <span class="detail-value" id="detailCategory"></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Código QR:</span>
+                                <span class="detail-value" id="detailQR"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="closeDetailsModal()">
+                        Cerrar
+                    </button>
+                    <button class="btn-primary" id="btnEditFromDetails">
+                        Editar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/db.js"></script>
+    <script src="libs/qrcode.min.js"></script>
+    <script src="js/productos.js"></script>
+</body>
+</html>
