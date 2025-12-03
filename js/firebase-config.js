@@ -3,14 +3,14 @@
    Configuración Firebase - SOLO FIRESTORE
    ======================================== */
 
-// REEMPLAZA con los valores de TU proyecto Firebase
+// Configuración de tu proyecto Firebase
 const firebaseConfig = {
-    apiKey: "TU_API_KEY_AQUI",
-    authDomain: "TU_PROJECT_ID.firebaseapp.com",
-    projectId: "TU_PROJECT_ID",
-    storageBucket: "TU_PROJECT_ID.appspot.com",
-    messagingSenderId: "TU_SENDER_ID",
-    appId: "TU_APP_ID"
+    apiKey: "AIzaSyAEZco1Ninx67P4bizFu-JawcwZNuL5Y-c",
+    authDomain: "safe-products-pwa.firebaseapp.com",
+    projectId: "safe-products-pwa",
+    storageBucket: "safe-products-pwa.firebasestorage.app",
+    messagingSenderId: "541256329730",
+    appId: "1:541256329730:web:a0d43922809be2dd53151b"
 };
 
 /* ========================================

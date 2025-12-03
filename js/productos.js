@@ -13,8 +13,8 @@ async function initProductos() {
     try {
         console.log('🛒 Inicializando módulo de productos...');
         
-        // Inicializar IndexedDB
-        await window.DB.init();
+        // Inicializar sistema de sincronización híbrido
+        await window.SyncDB.init();
         
         // Cargar categorías
         await loadCategories();
@@ -25,7 +25,7 @@ async function initProductos() {
         // Setup event listeners
         setupEventListeners();
         
-        console.log('✅ Módulo de productos listo');
+        console.log('✅ Módulo de productos listo (Híbrido: IndexedDB + Firestore)');
         
     } catch (error) {
         console.error('❌ Error al inicializar productos:', error);
@@ -38,7 +38,7 @@ async function initProductos() {
    ======================================== */
 async function loadCategories() {
     try {
-        categories = await window.DB.getAllCategories();
+        categories = await window.SyncDB.getAllCategories();
         
         // Llenar selects de categorías
         const selects = [
@@ -74,9 +74,9 @@ async function loadProducts(filter = '') {
     try {
         // Obtener productos según filtro
         if (filter) {
-            allProducts = await window.DB.filterByCategory(filter);
+            allProducts = await window.SyncDB.filterByCategory(filter);
         } else {
-            allProducts = await window.DB.getAllProducts();
+            allProducts = await window.SyncDB.getAllProducts();
         }
         
         // Renderizar
@@ -225,7 +225,7 @@ function openAddModal() {
 
 async function editProduct(id) {
     try {
-        const product = await window.DB.getProductById(id);
+        const product = await window.SyncDB.getProductById(id);
         
         if (!product) {
             alert('Producto no encontrado');
@@ -295,7 +295,7 @@ async function saveProduct(event) {
         // Guardar
         if (currentProductId) {
             // Actualizar
-            await window.DB.updateProduct(currentProductId, productData);
+            await window.SyncDB.updateProduct(currentProductId, productData);
             console.log('✅ Producto actualizado:', currentProductId);
             
             // Vibrar
@@ -304,7 +304,7 @@ async function saveProduct(event) {
             }
         } else {
             // Crear nuevo
-            const id = await window.DB.addProduct(productData);
+            const id = await window.SyncDB.addProduct(productData);
             console.log('✅ Producto creado:', id);
             
             // Vibrar
@@ -333,7 +333,7 @@ async function saveProduct(event) {
    ======================================== */
 async function deleteProduct(id) {
     try {
-        const product = await window.DB.getProductById(id);
+        const product = await window.SyncDB.getProductById(id);
         
         if (!product) {
             alert('Producto no encontrado');
@@ -346,7 +346,7 @@ async function deleteProduct(id) {
         
         if (!confirmed) return;
         
-        await window.DB.deleteProduct(id);
+        await window.SyncDB.deleteProduct(id);
         console.log('✅ Producto eliminado:', id);
         
         // Vibrar
@@ -368,7 +368,7 @@ async function deleteProduct(id) {
    ======================================== */
 async function viewProductDetails(id) {
     try {
-        const product = await window.DB.getProductById(id);
+        const product = await window.SyncDB.getProductById(id);
         
         if (!product) {
             alert('Producto no encontrado');
@@ -442,7 +442,7 @@ function setupSearch() {
                 renderProducts(allProducts);
             } else if (query.length >= 2) {
                 // Buscar
-                const results = await window.DB.searchProducts(query);
+                const results = await window.SyncDB.searchProducts(query);
                 renderProducts(results);
                 updateProductCount(results.length);
             }
