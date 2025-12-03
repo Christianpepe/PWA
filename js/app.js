@@ -22,13 +22,16 @@ async function initHome() {
     try {
         console.log('🚀 Inicializando Dashboard...');
         
-        // CREAR USUARIO FAKE (sin verificar autenticación)
-        const fakeUser = {
-            name: 'Juan Pérez',
-            email: 'juan@safeproducts.com'
-        };
-        localStorage.setItem('user', JSON.stringify(fakeUser));
-        appState.user = fakeUser;
+        // VERIFICAR AUTENTICACIÓN REAL
+        if (!isUserAuthenticated()) {
+            console.log('❌ Usuario no autenticado, redirigiendo a login...');
+            window.location.href = 'login.html';
+            return;
+        }
+        
+        // Obtener usuario de la sesión
+        const user = getUserFromSession();
+        appState.user = user;
         
         console.log('✅ Usuario simulado creado:', fakeUser);
         
@@ -44,6 +47,27 @@ async function initHome() {
     } catch (error) {
         console.error('❌ Error:', error);
         alert('Error al cargar. Revisa la consola (F12)');
+    }
+}
+
+/* ========================================
+   Autenticación
+   ======================================== */
+function isUserAuthenticated() {
+    const userData = localStorage.getItem('user');
+    return userData !== null;
+}
+
+function getUserFromSession() {
+    const userData = localStorage.getItem('user');
+    if (!userData) return null;
+    
+    try {
+        return JSON.parse(userData);
+    } catch (error) {
+        console.error('Error al parsear usuario:', error);
+        localStorage.removeItem('user');
+        return null;
     }
 }
 
@@ -205,16 +229,12 @@ function handleLogout() {
     
     console.log('✅ Cerrando sesión...');
     
-    // Limpiar
+    // Limpiar sesión
     localStorage.removeItem('user');
     appState.user = null;
     
-    alert('👋 Sesión cerrada\n\nNormalmente redirigirías a login.html\n\n🔄 Recargando página...');
-    
-    // Recargar
-    setTimeout(() => {
-        location.reload();
-    }, 500);
+    // Redirigir a login
+    window.location.href = 'login.html';
 }
 
 /* ========================================

@@ -13,6 +13,13 @@ async function initProductos() {
     try {
         console.log('🛒 Inicializando módulo de productos...');
         
+        // VERIFICAR AUTENTICACIÓN
+        if (!isUserAuthenticated()) {
+            console.log('❌ Usuario no autenticado, redirigiendo...');
+            window.location.href = 'login.html';
+            return;
+        }
+        
         // Inicializar sistema de sincronización híbrido
         await window.SyncDB.init();
         

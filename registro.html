@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Iniciar sesión en SafeProducts">
+    <meta name="description" content="Crear cuenta en SafeProducts">
     <meta name="theme-color" content="#2563eb">
     
-    <title>Iniciar Sesión - SafeProducts</title>
+    <title>Crear Cuenta - SafeProducts</title>
     
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192x192.png">
@@ -24,10 +24,24 @@
                 <h1>SafeProducts</h1>
             </div>
 
-            <!-- Formulario de Login -->
-            <form id="loginForm" class="auth-form">
-                <h2>Iniciar Sesión</h2>
-                <p class="auth-subtitle">Ingresa tus credenciales para continuar</p>
+            <!-- Formulario de Registro -->
+            <form id="registerForm" class="auth-form">
+                <h2>Crear Cuenta</h2>
+                <p class="auth-subtitle">Completa tus datos para registrarte</p>
+
+                <div class="form-group">
+                    <label for="name">Nombre Completo</label>
+                    <input 
+                        type="text" 
+                        id="name" 
+                        name="name"
+                        required 
+                        autocomplete="name"
+                        placeholder="Juan Pérez"
+                        minlength="3"
+                        maxlength="100"
+                    >
+                </div>
 
                 <div class="form-group">
                     <label for="email">Correo Electrónico</label>
@@ -48,7 +62,21 @@
                         id="password" 
                         name="password"
                         required 
-                        autocomplete="current-password"
+                        autocomplete="new-password"
+                        placeholder="••••••••"
+                        minlength="6"
+                    >
+                    <small>Mínimo 6 caracteres</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">Confirmar Contraseña</label>
+                    <input 
+                        type="password" 
+                        id="confirmPassword" 
+                        name="confirmPassword"
+                        required 
+                        autocomplete="new-password"
                         placeholder="••••••••"
                         minlength="6"
                     >
@@ -58,14 +86,14 @@
                 <div id="errorMessage" class="error-message hidden"></div>
 
                 <!-- Botón de submit -->
-                <button type="submit" class="btn-primary" id="btnLogin">
-                    Iniciar Sesión
+                <button type="submit" class="btn-primary" id="btnRegister">
+                    Crear Cuenta
                 </button>
 
-                <!-- Link a registro -->
+                <!-- Link a login -->
                 <p class="auth-footer">
-                    ¿No tienes cuenta? 
-                    <a href="registro.html" class="auth-link">Crear cuenta</a>
+                    ¿Ya tienes cuenta? 
+                    <a href="login.html" class="auth-link">Iniciar sesión</a>
                 </p>
             </form>
 

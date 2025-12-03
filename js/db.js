@@ -8,7 +8,8 @@ const DB_VERSION = 1;
 const STORES = {
     PRODUCTS: 'products',
     MOVEMENTS: 'movements',
-    CATEGORIES: 'categories'
+    CATEGORIES: 'categories',
+    USERS: 'users'
 };
 
 let db = null;
@@ -72,6 +73,18 @@ async function initDB() {
                 categoryStore.transaction.oncomplete = () => {
                     insertDefaultCategories();
                 };
+            }
+            
+            // Store de Usuarios
+            if (!db.objectStoreNames.contains(STORES.USERS)) {
+                const userStore = db.createObjectStore(STORES.USERS, {
+                    keyPath: 'id',
+                    autoIncrement: true
+                });
+                
+                userStore.createIndex('email', 'email', { unique: true });
+                
+                console.log('✅ Store "users" creado');
             }
         };
         
