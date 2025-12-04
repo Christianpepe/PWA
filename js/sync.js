@@ -1,6 +1,7 @@
 /* ========================================
-   sync.js - Sincronización Híbrida (CORREGIDO)
+   sync.js - Sincronización Híbrida COMPLETA
    IndexedDB (local/offline) + Firestore (remoto)
+   CON SOPORTE PARA PRODUCTOS Y MOVIMIENTOS
    ======================================== */
 
 let syncInProgress = false;
@@ -54,6 +55,23 @@ async function cleanupDuplicates() {
     }
 }
 
+function generateQRCode() {
+    return 'SP-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+}
+
+function getCurrentUserId() {
+    try {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            const user = JSON.parse(userData);
+            return user.email || user.firestoreId || 'unknown';
+        }
+    } catch (error) {
+        console.error('Error obteniendo usuario:', error);
+    }
+    return 'unknown';
+}
+
 /* ========================================
    Inicialización
    ======================================== */
@@ -70,7 +88,7 @@ async function initSync() {
 }
 
 /* ========================================
-   SINCRONIZACIÓN: Firestore → IndexedDB
+   SINCRONIZACIÓN: Firestore → IndexedDB (PRODUCTOS)
    ======================================== */
 async function syncFromFirestoreToIndexedDB() {
     if (syncInProgress) {
@@ -79,7 +97,7 @@ async function syncFromFirestoreToIndexedDB() {
     }
     
     syncInProgress = true;
-    console.log('📥 Sincronizando Firestore → IndexedDB...');
+    console.log('📥 Sincronizando Firestore → IndexedDB (Productos)...');
     
     try {
         // Obtener productos de Firestore
@@ -169,20 +187,20 @@ async function syncFromFirestoreToIndexedDB() {
             }
         }
         
-        console.log(`✅ Sync: ${created} creados, ${updated} actualizados, ${skipped} sin cambios`);
+        console.log(`✅ Sync Productos: ${created} creados, ${updated} actualizados, ${skipped} sin cambios`);
         
         // Limpiar duplicados
         await cleanupDuplicates();
         
     } catch (error) {
-        console.error('❌ Error en sincronización:', error);
+        console.error('❌ Error en sincronización de productos:', error);
     } finally {
         syncInProgress = false;
     }
 }
 
 /* ========================================
-   SINCRONIZACIÓN: IndexedDB → Firestore
+   SINCRONIZACIÓN: IndexedDB → Firestore (PRODUCTOS)
    ======================================== */
 async function syncFromIndexedDBToFirestore() {
     if (!navigator.onLine) {
@@ -190,7 +208,7 @@ async function syncFromIndexedDBToFirestore() {
         return;
     }
     
-    console.log('📤 Sincronizando IndexedDB → Firestore...');
+    console.log('📤 Sincronizando IndexedDB → Firestore (Productos)...');
     
     try {
         const localProducts = await window.DB.getAllProducts();
@@ -215,7 +233,7 @@ async function syncFromIndexedDBToFirestore() {
                     });
                     
                     uploaded++;
-                    console.log(`📤 Subido: ${product.name}`);
+                    console.log(`📤 Producto subido: ${product.name}`);
                     
                 } catch (error) {
                     console.error(`❌ Error subiendo ${product.name}:`, error);
@@ -228,12 +246,12 @@ async function syncFromIndexedDBToFirestore() {
         }
         
     } catch (error) {
-        console.error('❌ Error al subir:', error);
+        console.error('❌ Error al subir productos:', error);
     }
 }
 
 /* ========================================
-   OPERACIONES HÍBRIDAS
+   OPERACIONES HÍBRIDAS - PRODUCTOS
    ======================================== */
 
 async function addProductHybrid(productData) {
@@ -245,7 +263,7 @@ async function addProductHybrid(productData) {
         
         // 1. Guardar localmente
         const localId = await window.DB.addProduct(productData);
-        console.log('✅ Guardado localmente:', localId);
+        console.log('✅ Producto guardado localmente:', localId);
         
         // 2. Subir a Firestore
         if (navigator.onLine) {
@@ -257,7 +275,7 @@ async function addProductHybrid(productData) {
                     firestoreId: docId 
                 });
                 
-                console.log('✅ Sincronizado con Firestore:', docId);
+                console.log('✅ Producto sincronizado con Firestore:', docId);
                 
             } catch (error) {
                 console.warn('⚠️ No se pudo subir, se sincronizará después');
@@ -351,43 +369,271 @@ async function getStatsHybrid() {
 }
 
 /* ========================================
-   Event Handlers
+   OPERACIONES HÍBRIDAS - MOVIMIENTOS
    ======================================== */
-async function handleOnlineSync() {
-    console.log('🌐 Conexión restaurada');
-    await syncFromIndexedDBToFirestore();
-    await syncFromFirestoreToIndexedDB();
+
+/**
+ * Agregar movimiento (entrada/salida) con sincronización
+ * Guarda localmente y sincroniza con Firestore
+ */
+async function addMovementHybrid(movementData) {
+    try {
+        // VALIDACIÓN: Verificar que el producto existe
+        const product = await window.DB.getProductById(movementData.productId);
+        
+        if (!product) {
+            throw new Error('Producto no encontrado');
+        }
+        
+        // VALIDAR STOCK SUFICIENTE (para salidas)
+        if (movementData.type === 'salida') {
+            if (product.quantity < movementData.quantity) {
+                throw new Error(`Stock insuficiente. Disponible: ${product.quantity}`);
+            }
+        }
+        
+        // 1. GUARDAR MOVIMIENTO LOCALMENTE (IndexedDB)
+        // Esto automáticamente actualiza el stock del producto
+        const localMovementId = await window.DB.addMovement(movementData);
+        console.log('✅ Movimiento guardado localmente:', localMovementId);
+        
+        // 2. SUBIR A FIRESTORE SI HAY CONEXIÓN
+        let firestoreMovementId = null;
+        
+        if (navigator.onLine && window.FirebaseDB) {
+            try {
+                // Preparar datos para Firestore
+                const firestoreMovementData = {
+                    productId: product.firestoreId || product.id, // Usar firestoreId si existe
+                    productName: product.name,
+                    type: movementData.type,
+                    quantity: movementData.quantity,
+                    note: movementData.note || '',
+                    userId: getCurrentUserId(),
+                    createdAt: new Date().toISOString()
+                };
+                
+                firestoreMovementId = await window.FirebaseDB.addMovement(firestoreMovementData);
+                
+                console.log('✅ Movimiento sincronizado con Firestore:', firestoreMovementId);
+                
+                // ACTUALIZAR STOCK EN FIRESTORE
+                if (product.firestoreId) {
+                    const updatedProduct = await window.DB.getProductById(product.id);
+                    await window.FirebaseDB.updateProduct(product.firestoreId, {
+                        quantity: updatedProduct.quantity
+                    });
+                    console.log('✅ Stock actualizado en Firestore');
+                }
+                
+            } catch (error) {
+                console.warn('⚠️ No se pudo sincronizar movimiento con Firestore:', error);
+                // El movimiento queda guardado localmente y se sincronizará después
+            }
+        } else {
+            console.log('📴 Sin conexión - Movimiento se sincronizará después');
+        }
+        
+        // 3. RETORNAR ID LOCAL
+        return localMovementId;
+        
+    } catch (error) {
+        console.error('❌ Error al agregar movimiento:', error);
+        throw error;
+    }
+}
+
+/**
+ * Obtener todos los movimientos (solo lectura local)
+ */
+async function getAllMovementsHybrid() {
+    try {
+        return await window.DB.getAllMovements();
+    } catch (error) {
+        console.error('❌ Error al obtener movimientos:', error);
+        return [];
+    }
+}
+
+/**
+ * Obtener movimientos por producto
+ */
+async function getMovementsByProductHybrid(productId) {
+    try {
+        return await window.DB.getMovementsByProduct(productId);
+    } catch (error) {
+        console.error('❌ Error al obtener movimientos del producto:', error);
+        return [];
+    }
+}
+
+/**
+ * Sincronizar movimientos pendientes (IndexedDB → Firestore)
+ */
+async function syncPendingMovements() {
+    if (!navigator.onLine || !window.FirebaseDB) {
+        console.log('📴 Sin conexión - No se pueden sincronizar movimientos');
+        return;
+    }
+    
+    console.log('🔄 Sincronizando movimientos pendientes...');
+    
+    try {
+        // Obtener todos los movimientos locales
+        const localMovements = await window.DB.getAllMovements();
+        
+        // Por simplicidad, subir todos los movimientos de las últimas 24 horas
+        // (en producción podrías usar un flag "synced" en cada movimiento)
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        const recentMovements = localMovements.filter(m => {
+            const movDate = new Date(m.date);
+            return movDate >= yesterday;
+        });
+        
+        if (recentMovements.length === 0) {
+            console.log('✅ No hay movimientos recientes para sincronizar');
+            return;
+        }
+        
+        console.log(`📤 Subiendo ${recentMovements.length} movimientos recientes...`);
+        
+        let uploaded = 0;
+        let failed = 0;
+        
+        for (const movement of recentMovements) {
+            try {
+                // Obtener producto para tener su firestoreId
+                const product = await window.DB.getProductById(movement.productId);
+                
+                if (!product || !product.firestoreId) {
+                    console.warn(`⚠️ Producto no encontrado o sin firestoreId:`, movement.productId);
+                    failed++;
+                    continue;
+                }
+                
+                // Subir a Firestore
+                const firestoreData = {
+                    productId: product.firestoreId,
+                    productName: movement.productName,
+                    type: movement.type,
+                    quantity: movement.quantity,
+                    note: movement.note || '',
+                    date: movement.date,
+                    userId: getCurrentUserId()
+                };
+                
+                await window.FirebaseDB.addMovement(firestoreData);
+                
+                uploaded++;
+                console.log(`✅ Movimiento subido: ${movement.productName} (${movement.type})`);
+                
+            } catch (error) {
+                console.error(`❌ Error subiendo movimiento:`, error);
+                failed++;
+            }
+        }
+        
+        console.log(`✅ Sincronización de movimientos: ${uploaded} subidos, ${failed} fallidos`);
+        
+        // También sincronizar el stock actualizado
+        await syncProductStockToFirestore();
+        
+    } catch (error) {
+        console.error('❌ Error en sincronización de movimientos:', error);
+    }
+}
+
+/**
+ * Sincronizar stock de productos a Firestore
+ */
+async function syncProductStockToFirestore() {
+    if (!navigator.onLine || !window.FirebaseDB) {
+        return;
+    }
+    
+    console.log('🔄 Sincronizando stock de productos...');
+    
+    try {
+        const localProducts = await window.DB.getAllProducts();
+        
+        let updated = 0;
+        
+        for (const product of localProducts) {
+            if (product.firestoreId) {
+                try {
+                    await window.FirebaseDB.updateProduct(product.firestoreId, {
+                        quantity: product.quantity
+                    });
+                    updated++;
+                } catch (error) {
+                    console.warn(`⚠️ Error actualizando stock de ${product.name}`);
+                }
+            }
+        }
+        
+        console.log(`✅ ${updated} productos con stock actualizado`);
+        
+    } catch (error) {
+        console.error('❌ Error sincronizando stock:', error);
+    }
 }
 
 /* ========================================
-   Utilidades
+   Event Handlers
    ======================================== */
-function generateQRCode() {
-    return 'SP-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+async function handleOnlineSync() {
+    console.log('🌐 Conexión restaurada - Iniciando sincronización completa...');
+    
+    try {
+        // 1. Sincronizar productos
+        await syncFromIndexedDBToFirestore();
+        await syncFromFirestoreToIndexedDB();
+        
+        // 2. Sincronizar movimientos pendientes
+        await syncPendingMovements();
+        
+        console.log('✅ Sincronización completa finalizada');
+        
+        // Notificar al usuario
+        if ('vibrate' in navigator) {
+            navigator.vibrate(200);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en sincronización automática:', error);
+    }
 }
 
 /* ========================================
    API Exportada
    ======================================== */
 window.SyncDB = {
+    // Sistema
     init: initSync,
     syncDown: syncFromFirestoreToIndexedDB,
     syncUp: syncFromIndexedDBToFirestore,
     
+    // Productos
     addProduct: addProductHybrid,
     updateProduct: updateProductHybrid,
     deleteProduct: deleteProductHybrid,
     getAllProducts: getAllProductsHybrid,
     getStats: getStatsHybrid,
-    
     searchProducts: window.DB.searchProducts,
     filterByCategory: window.DB.filterByCategory,
     getProductById: window.DB.getProductById,
     getProductByQR: window.DB.getProductByQR,
     
-    addMovement: window.DB.addMovement,
-    getAllMovements: window.DB.getAllMovements,
+    // Movimientos
+    addMovement: addMovementHybrid,
+    getAllMovements: getAllMovementsHybrid,
+    getMovementsByProduct: getMovementsByProductHybrid,
+    syncPendingMovements: syncPendingMovements,
+    
+    // Categorías
     getAllCategories: window.DB.getAllCategories
 };
 
-console.log('✅ sync.js cargado - Sistema híbrido listo');
+console.log('✅ sync.js cargado - Sistema híbrido completo (Productos + Movimientos)');

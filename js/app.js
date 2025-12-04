@@ -33,7 +33,7 @@ async function initHome() {
         const user = getUserFromSession();
         appState.user = user;
         
-        console.log('✅ Usuario simulado creado:', fakeUser);
+        console.log('✅ Usuario autenticado:', appState.user?.name);
         
         // Cargar datos
         loadUserData();

@@ -78,11 +78,34 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: var(--spacing-md);
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.section-header > div {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex: 1;
+    min-width: 200px;
+}
+
+.section-header > button {
+    flex-shrink: 0;
+    white-space: nowrap;
+    width: auto !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem !important;
+    font-size: 0.95rem;
+    height: fit-content;
 }
 
 .section-header h2 {
     font-size: var(--font-size-xl);
     font-weight: 600;
+    margin: 0;
 }
 
 .count-badge {
@@ -418,6 +441,16 @@
 
 /* Responsive */
 @media (max-width: 640px) {
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .section-header > button {
+        align-self: flex-start;
+        width: 100% !important;
+    }
+    
     .products-grid {
         grid-template-columns: 1fr;
     }

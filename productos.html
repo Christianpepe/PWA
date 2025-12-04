@@ -45,8 +45,17 @@
             <!-- Lista de Productos -->
             <section class="products-section">
                 <div class="section-header">
-                    <h2>Inventario</h2>
-                    <span id="productCount" class="count-badge">0 productos</span>
+                    <div>
+                        <h2>Inventario</h2>
+                        <span id="productCount" class="count-badge">0 productos</span>
+                    </div>
+                    <button class="btn-primary" onclick="openAddModal()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="display: inline; margin-right: 8px;">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Agregar Producto
+                    </button>
                 </div>
                 
                 <div id="productsList" class="products-grid">
@@ -235,6 +244,9 @@
                     showBack: true,
                     backUrl: 'home.html'
                 });
+                
+                // Inicializar productos con espera a Firebase
+                initProductos();
             });
         } else {
             window.Components.initComponents({ 
@@ -242,6 +254,9 @@
                 showBack: true,
                 backUrl: 'home.html'
             });
+            
+            // Inicializar productos con espera a Firebase
+            initProductos();
         }
     </script>
 </body>

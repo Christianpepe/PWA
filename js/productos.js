@@ -1,5 +1,6 @@
 /* ========================================
-   productos.js - Lógica CRUD de Productos (CORREGIDO)
+   productos.js - CORREGIDO
+   Ahora descarga productos de Firebase al iniciar
    ======================================== */
 
 let currentProductId = null;
@@ -7,7 +8,7 @@ let allProducts = [];
 let categories = [];
 
 /* ========================================
-   Inicialización
+   Inicialización - CORREGIDA
    ======================================== */
 async function initProductos() {
     try {
@@ -20,24 +21,56 @@ async function initProductos() {
             return;
         }
         
-        // Inicializar sistema de sincronización híbrido
+        // Mostrar indicador de carga
+        showLoadingIndicator();
+        
+        // 0. Esperar a que Firebase esté listo
+        console.log('⏳ Esperando que Firebase esté disponible...');
+        let attempt = 0;
+        while (!window.FirebaseDB && attempt < 50) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempt++;
+        }
+        
+        if (!window.FirebaseDB) {
+            console.warn('⚠️ Firebase no se inicializó correctamente');
+        } else {
+            console.log('✅ Firebase disponible');
+        }
+        
+        // 1. Inicializar sistema de sincronización híbrido
         await window.SyncDB.init();
         
-        // IMPORTANTE: Limpiar duplicados ANTES de cargar
+        // 2. 🔥 NUEVO: Sincronizar desde Firebase PRIMERO
+        console.log('🔄 Sincronizando productos desde Firebase...');
+        
+        if (navigator.onLine && window.FirebaseDB) {
+            try {
+                await window.SyncDB.syncDown(); // Descargar de Firebase → IndexedDB
+                console.log('✅ Productos sincronizados desde Firebase');
+            } catch (error) {
+                console.warn('⚠️ No se pudo sincronizar desde Firebase:', error);
+                // Continuar con datos locales si hay error
+            }
+        } else {
+            console.log('📴 Sin conexión - Usando datos locales');
+        }
+        
+        // 3. Limpiar duplicados
         if (typeof window.cleanIndexedDB === 'function') {
             await window.cleanIndexedDB();
         }
         
-        // Cargar categorías
+        // 4. Cargar categorías
         await loadCategories();
         
-        // Cargar productos (SIN sincronizar automáticamente)
+        // 5. Cargar productos (ahora ya descargados de Firebase)
         await loadProducts();
         
-        // Setup event listeners
+        // 6. Setup event listeners
         setupEventListeners();
         
-        // Verificar si viene del escaneo
+        // 7. Verificar si viene del escaneo
         const urlParams = new URLSearchParams(window.location.search);
         const editId = urlParams.get('edit');
         if (editId) {
@@ -45,14 +78,77 @@ async function initProductos() {
             editProduct(productId);
         }
         
-        console.log('✅ Módulo de productos listo (Híbrido: IndexedDB + Firestore)');
+        // Ocultar indicador de carga
+        hideLoadingIndicator();
         
-        console.log('✅ Módulo de productos listo (Híbrido: IndexedDB + Firestore)');
+        console.log('✅ Módulo de productos listo (Con sincronización Firebase)');
         
     } catch (error) {
         console.error('❌ Error al inicializar productos:', error);
-        alert('Error al cargar productos. Recarga la página.');
+        hideLoadingIndicator();
+        showError('Error al cargar productos. Intenta recargar la página.');
     }
+}
+
+/* ========================================
+   Indicadores de Carga
+   ======================================== */
+function showLoadingIndicator() {
+    const indicator = document.createElement('div');
+    indicator.id = 'loadingIndicator';
+    indicator.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
+        color: white;
+        padding: 0.75rem;
+        text-align: center;
+        font-weight: 500;
+        z-index: 9999;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    `;
+    indicator.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+            <div style="width: 16px; height: 16px; border: 2px solid white; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+            <span>Sincronizando productos...</span>
+        </div>
+        <style>
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+        </style>
+    `;
+    document.body.appendChild(indicator);
+}
+
+function hideLoadingIndicator() {
+    const indicator = document.getElementById('loadingIndicator');
+    if (indicator) {
+        indicator.remove();
+    }
+}
+
+function showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = `
+        position: fixed;
+        top: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ef4444;
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 9999;
+        max-width: 90%;
+    `;
+    errorDiv.textContent = message;
+    document.body.appendChild(errorDiv);
+    
+    setTimeout(() => errorDiv.remove(), 5000);
 }
 
 /* ========================================
@@ -96,15 +192,7 @@ async function loadProducts(filter = '') {
     try {
         console.log('📦 Cargando productos...');
         
-        // CRÍTICO: NO sincronizar en cada carga, solo obtener datos locales
-        // La sincronización debe ser manual o cuando se restaura conexión
-        
-        // Limpiar duplicados PRIMERO
-        if (typeof window.cleanIndexedDB === 'function') {
-            await window.cleanIndexedDB();
-        }
-        
-        // Obtener productos según filtro (SOLO DE INDEXEDDB)
+        // Obtener productos según filtro (ya están sincronizados)
         if (filter) {
             allProducts = await window.SyncDB.filterByCategory(filter);
         } else {
@@ -138,12 +226,11 @@ function renderProducts(products) {
     // Ocultar empty state
     if (emptyState) emptyState.classList.add('hidden');
     
-    // CRÍTICO: Eliminar duplicados por ID antes de renderizar
+    // Eliminar duplicados por ID
     const uniqueProducts = [];
     const seenIds = new Set();
     
     products.forEach(product => {
-        // Usar firestoreId como identificador único (o ID local si no tiene)
         const uniqueId = product.firestoreId || product.id;
         
         if (!seenIds.has(uniqueId)) {
@@ -154,7 +241,7 @@ function renderProducts(products) {
         }
     });
     
-    console.log(`📊 Renderizando ${uniqueProducts.length} productos únicos (de ${products.length} totales)`);
+    console.log(`📊 Renderizando ${uniqueProducts.length} productos únicos`);
     
     // Renderizar productos únicos
     container.innerHTML = uniqueProducts.map(product => createProductCard(product)).join('');
@@ -365,7 +452,7 @@ async function saveProduct(event) {
             }
         }
         
-        // Recargar lista (sin sincronizar de nuevo)
+        // Recargar lista
         await loadProducts();
         
         // Cerrar modal
@@ -573,4 +660,4 @@ if (document.readyState === 'loading') {
     initProductos();
 }
 
-console.log('✅ productos.js cargado');
+console.log('✅ productos.js cargado (Con sincronización automática)');
