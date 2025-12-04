@@ -1,9 +1,58 @@
 /* ========================================
-   sync.js - Sincronización Híbrida
+   sync.js - Sincronización Híbrida (CORREGIDO)
    IndexedDB (local/offline) + Firestore (remoto)
    ======================================== */
 
 let syncInProgress = false;
+
+/* ========================================
+   UTILIDADES
+   ======================================== */
+async function cleanupDuplicates() {
+    try {
+        console.log('🧹 Limpiando duplicados...');
+        const allProducts = await window.DB.getAllProducts();
+        
+        // Agrupar por nombre + categoría (cuando falta QR)
+        const byKey = {};
+        allProducts.forEach(p => {
+            const key = `${p.name}_${p.category}_${p.price}`;
+            if (!byKey[key]) {
+                byKey[key] = [];
+            }
+            byKey[key].push(p);
+        });
+        
+        // Eliminar duplicados
+        let deleted = 0;
+        for (const [key, products] of Object.entries(byKey)) {
+            if (products.length > 1) {
+                // Mantener el que tiene firestoreId, o el más reciente
+                products.sort((a, b) => {
+                    if (a.firestoreId && !b.firestoreId) return -1;
+                    if (!a.firestoreId && b.firestoreId) return 1;
+                    return new Date(b.updatedAt) - new Date(a.updatedAt);
+                });
+                
+                // Eliminar duplicados
+                for (let i = 1; i < products.length; i++) {
+                    await window.DB.deleteProduct(products[i].id);
+                    deleted++;
+                    console.log(`🗑️ Duplicado eliminado: ${products[i].name} (ID: ${products[i].id})`);
+                }
+            }
+        }
+        
+        if (deleted > 0) {
+            console.log(`✅ ${deleted} duplicados eliminados`);
+        } else {
+            console.log('✅ No hay duplicados');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error limpiando duplicados:', error);
+    }
+}
 
 /* ========================================
    Inicialización
@@ -14,20 +63,14 @@ async function initSync() {
     // Inicializar IndexedDB primero
     await window.DB.init();
     
-    // Intentar sincronización inicial
-    if (navigator.onLine) {
-        await syncFromFirestoreToIndexedDB();
-    }
-    
-    // Monitorear conexión para auto-sync
-    window.addEventListener('online', handleOnlineSync);
-    
     console.log('✅ Sistema de sincronización listo');
+    
+    // Monitorear conexión
+    window.addEventListener('online', handleOnlineSync);
 }
 
 /* ========================================
    SINCRONIZACIÓN: Firestore → IndexedDB
-   Descargar datos remotos al cache local
    ======================================== */
 async function syncFromFirestoreToIndexedDB() {
     if (syncInProgress) {
@@ -43,7 +86,7 @@ async function syncFromFirestoreToIndexedDB() {
         const firestoreProducts = await window.FirebaseDB.getAllProducts();
         
         if (firestoreProducts.length === 0) {
-            console.log('ℹ️ No hay productos en Firestore para sincronizar');
+            console.log('ℹ️ No hay productos en Firestore');
             syncInProgress = false;
             return;
         }
@@ -51,52 +94,85 @@ async function syncFromFirestoreToIndexedDB() {
         // Obtener productos locales
         const localProducts = await window.DB.getAllProducts();
         
-        // Crear mapa de productos locales por QR
-        const localMap = new Map();
+        // Crear mapa por firestoreId
+        const localByFirestoreId = new Map();
         localProducts.forEach(p => {
-            localMap.set(p.qrCode, p);
+            if (p.firestoreId) {
+                localByFirestoreId.set(p.firestoreId, p);
+            }
         });
         
         let updated = 0;
         let created = 0;
+        let skipped = 0;
         
-        // Sincronizar cada producto
-        for (const firestoreProduct of firestoreProducts) {
-            const localProduct = localMap.get(firestoreProduct.qrCode);
+        for (const fsProduct of firestoreProducts) {
+            // El ID del documento de Firestore
+            const docId = fsProduct.firestoreId;
+            
+            // Buscar si ya existe localmente
+            let localProduct = localByFirestoreId.get(docId);
+            
+            // Si no existe, buscar por nombre + categoría + precio (última opción)
+            if (!localProduct) {
+                localProduct = localProducts.find(p => 
+                    p.name === fsProduct.name &&
+                    p.category === fsProduct.category &&
+                    p.price === fsProduct.price &&
+                    !p.firestoreId // Solo productos sin vincular
+                );
+                
+                // Si lo encontramos, vincular
+                if (localProduct) {
+                    console.log(`🔗 Vinculando: ${localProduct.name}`);
+                    await window.DB.updateProduct(localProduct.id, {
+                        firestoreId: docId
+                    });
+                    localProduct.firestoreId = docId;
+                }
+            }
             
             if (localProduct) {
-                // Actualizar si el de Firestore es más reciente
-                const firestoreTime = firestoreProduct.updatedAt?.toDate?.() || new Date(0);
+                // Actualizar si Firestore es más reciente
+                const fsTime = fsProduct.updatedAt?.toDate?.() || new Date(0);
                 const localTime = new Date(localProduct.updatedAt);
                 
-                if (firestoreTime > localTime) {
+                if (fsTime > localTime) {
                     await window.DB.updateProduct(localProduct.id, {
-                        name: firestoreProduct.name,
-                        description: firestoreProduct.description,
-                        price: firestoreProduct.price,
-                        quantity: firestoreProduct.quantity,
-                        category: firestoreProduct.category,
-                        firestoreId: firestoreProduct.firestoreId,
-                        updatedAt: firestoreProduct.updatedAt?.toDate?.().toISOString() || new Date().toISOString()
+                        name: fsProduct.name,
+                        description: fsProduct.description,
+                        price: fsProduct.price,
+                        quantity: fsProduct.quantity,
+                        category: fsProduct.category,
+                        qrCode: fsProduct.qrCode || localProduct.qrCode,
+                        firestoreId: docId,
+                        updatedAt: fsProduct.updatedAt?.toDate?.().toISOString() || new Date().toISOString()
                     });
                     updated++;
+                } else {
+                    skipped++;
                 }
             } else {
                 // Crear nuevo producto local
                 await window.DB.addProduct({
-                    name: firestoreProduct.name,
-                    description: firestoreProduct.description,
-                    price: firestoreProduct.price,
-                    quantity: firestoreProduct.quantity,
-                    category: firestoreProduct.category,
-                    qrCode: firestoreProduct.qrCode,
-                    firestoreId: firestoreProduct.firestoreId
+                    name: fsProduct.name,
+                    description: fsProduct.description,
+                    price: fsProduct.price,
+                    quantity: fsProduct.quantity,
+                    category: fsProduct.category,
+                    qrCode: fsProduct.qrCode || generateQRCode(),
+                    firestoreId: docId,
+                    createdAt: fsProduct.createdAt?.toDate?.().toISOString() || new Date().toISOString(),
+                    updatedAt: fsProduct.updatedAt?.toDate?.().toISOString() || new Date().toISOString()
                 });
                 created++;
             }
         }
         
-        console.log(`✅ Sincronización completa: ${created} creados, ${updated} actualizados`);
+        console.log(`✅ Sync: ${created} creados, ${updated} actualizados, ${skipped} sin cambios`);
+        
+        // Limpiar duplicados
+        await cleanupDuplicates();
         
     } catch (error) {
         console.error('❌ Error en sincronización:', error);
@@ -107,11 +183,10 @@ async function syncFromFirestoreToIndexedDB() {
 
 /* ========================================
    SINCRONIZACIÓN: IndexedDB → Firestore
-   Subir cambios locales a la nube
    ======================================== */
 async function syncFromIndexedDBToFirestore() {
     if (!navigator.onLine) {
-        console.log('📴 Sin conexión, guardando cambios localmente');
+        console.log('📴 Sin conexión');
         return;
     }
     
@@ -119,166 +194,153 @@ async function syncFromIndexedDBToFirestore() {
     
     try {
         const localProducts = await window.DB.getAllProducts();
-        
         let uploaded = 0;
         
-        for (const localProduct of localProducts) {
-            // Si no tiene firestoreId, es nuevo
-            if (!localProduct.firestoreId) {
-                const firestoreId = await window.FirebaseDB.addProduct({
-                    name: localProduct.name,
-                    description: localProduct.description,
-                    price: localProduct.price,
-                    quantity: localProduct.quantity,
-                    category: localProduct.category,
-                    qrCode: localProduct.qrCode
-                });
-                
-                // Guardar el firestoreId en IndexedDB
-                await window.DB.updateProduct(localProduct.id, {
-                    firestoreId: firestoreId
-                });
-                
-                uploaded++;
+        for (const product of localProducts) {
+            // Solo subir productos sin firestoreId
+            if (!product.firestoreId) {
+                try {
+                    const docId = await window.FirebaseDB.addProduct({
+                        name: product.name,
+                        description: product.description,
+                        price: product.price,
+                        quantity: product.quantity,
+                        category: product.category,
+                        qrCode: product.qrCode
+                    });
+                    
+                    // Guardar firestoreId localmente
+                    await window.DB.updateProduct(product.id, {
+                        firestoreId: docId
+                    });
+                    
+                    uploaded++;
+                    console.log(`📤 Subido: ${product.name}`);
+                    
+                } catch (error) {
+                    console.error(`❌ Error subiendo ${product.name}:`, error);
+                }
             }
         }
         
         if (uploaded > 0) {
-            console.log(`✅ ${uploaded} productos subidos a Firestore`);
+            console.log(`✅ ${uploaded} productos subidos`);
         }
         
     } catch (error) {
-        console.error('❌ Error al subir a Firestore:', error);
+        console.error('❌ Error al subir:', error);
     }
 }
 
 /* ========================================
-   OPERACIONES HÍBRIDAS (Dual Write)
-   Escribe en ambos: local + remoto
+   OPERACIONES HÍBRIDAS
    ======================================== */
 
-// Agregar Producto (Híbrido)
 async function addProductHybrid(productData) {
     try {
-        // 1. Guardar en IndexedDB (siempre funciona)
-        const localId = await window.DB.addProduct(productData);
-        console.log('✅ Producto guardado localmente:', localId);
+        // Generar QR si no existe
+        if (!productData.qrCode) {
+            productData.qrCode = generateQRCode();
+        }
         
-        // 2. Intentar subir a Firestore
+        // 1. Guardar localmente
+        const localId = await window.DB.addProduct(productData);
+        console.log('✅ Guardado localmente:', localId);
+        
+        // 2. Subir a Firestore
         if (navigator.onLine) {
             try {
-                const firestoreId = await window.FirebaseDB.addProduct(productData);
+                const docId = await window.FirebaseDB.addProduct(productData);
                 
-                // Actualizar el producto local con el firestoreId
-                await window.DB.updateProduct(localId, { firestoreId });
+                // Vincular con firestoreId
+                await window.DB.updateProduct(localId, { 
+                    firestoreId: docId 
+                });
                 
-                console.log('✅ Producto sincronizado con Firestore:', firestoreId);
+                console.log('✅ Sincronizado con Firestore:', docId);
+                
             } catch (error) {
-                console.warn('⚠️ No se pudo subir a Firestore, se sincronizará después:', error);
+                console.warn('⚠️ No se pudo subir, se sincronizará después');
             }
-        } else {
-            console.log('📴 Offline: producto se sincronizará cuando haya conexión');
         }
         
         return localId;
         
     } catch (error) {
-        console.error('❌ Error al agregar producto:', error);
+        console.error('❌ Error:', error);
         throw error;
     }
 }
 
-// Actualizar Producto (Híbrido)
 async function updateProductHybrid(localId, updates) {
     try {
-        // Obtener producto actual
         const product = await window.DB.getProductById(localId);
         
         if (!product) {
             throw new Error('Producto no encontrado');
         }
         
-        // 1. Actualizar IndexedDB
+        // 1. Actualizar localmente
         await window.DB.updateProduct(localId, updates);
-        console.log('✅ Producto actualizado localmente');
         
-        // 2. Actualizar Firestore si tiene firestoreId
+        // 2. Actualizar en Firestore
         if (product.firestoreId && navigator.onLine) {
             try {
                 await window.FirebaseDB.updateProduct(product.firestoreId, updates);
-                console.log('✅ Producto actualizado en Firestore');
             } catch (error) {
-                console.warn('⚠️ No se pudo actualizar en Firestore:', error);
+                console.warn('⚠️ No se pudo actualizar en Firestore');
             }
         }
         
         return true;
         
     } catch (error) {
-        console.error('❌ Error al actualizar producto:', error);
+        console.error('❌ Error:', error);
         throw error;
     }
 }
 
-// Eliminar Producto (Híbrido)
 async function deleteProductHybrid(localId) {
     try {
-        // Obtener producto antes de eliminar
         const product = await window.DB.getProductById(localId);
         
         if (!product) {
             throw new Error('Producto no encontrado');
         }
         
-        // 1. Eliminar de IndexedDB
+        // 1. Eliminar localmente
         await window.DB.deleteProduct(localId);
-        console.log('✅ Producto eliminado localmente');
         
         // 2. Eliminar de Firestore
         if (product.firestoreId && navigator.onLine) {
             try {
                 await window.FirebaseDB.deleteProduct(product.firestoreId);
-                console.log('✅ Producto eliminado de Firestore');
             } catch (error) {
-                console.warn('⚠️ No se pudo eliminar de Firestore:', error);
+                console.warn('⚠️ No se pudo eliminar de Firestore');
             }
         }
         
         return true;
         
     } catch (error) {
-        console.error('❌ Error al eliminar producto:', error);
+        console.error('❌ Error:', error);
         throw error;
     }
 }
 
-// Obtener Todos los Productos (Híbrido)
 async function getAllProductsHybrid() {
     try {
-        // Primero intentar desde IndexedDB (más rápido)
-        const localProducts = await window.DB.getAllProducts();
-        
-        // Si estamos online y no hay productos locales, sincronizar
-        if (localProducts.length === 0 && navigator.onLine) {
-            await syncFromFirestoreToIndexedDB();
-            return await window.DB.getAllProducts();
-        }
-        
-        return localProducts;
-        
+        return await window.DB.getAllProducts();
     } catch (error) {
-        console.error('❌ Error al obtener productos:', error);
+        console.error('❌ Error:', error);
         return [];
     }
 }
 
-// Obtener Estadísticas (Híbrido)
 async function getStatsHybrid() {
     try {
-        // Usar datos locales para estadísticas (más rápido)
         return await window.DB.getStats();
     } catch (error) {
-        console.error('❌ Error al obtener estadísticas:', error);
         return {
             totalProducts: 0,
             totalStock: 0,
@@ -292,48 +354,40 @@ async function getStatsHybrid() {
    Event Handlers
    ======================================== */
 async function handleOnlineSync() {
-    console.log('🌐 Conexión restaurada, sincronizando...');
-    
-    // Subir cambios locales pendientes
+    console.log('🌐 Conexión restaurada');
     await syncFromIndexedDBToFirestore();
-    
-    // Descargar cambios remotos
     await syncFromFirestoreToIndexedDB();
 }
 
 /* ========================================
-   Exportar API Unificada
+   Utilidades
+   ======================================== */
+function generateQRCode() {
+    return 'SP-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+}
+
+/* ========================================
+   API Exportada
    ======================================== */
 window.SyncDB = {
-    // Inicialización
     init: initSync,
-    
-    // Sincronización manual
     syncDown: syncFromFirestoreToIndexedDB,
     syncUp: syncFromIndexedDBToFirestore,
     
-    // CRUD Híbrido (usa automáticamente local + remoto)
     addProduct: addProductHybrid,
     updateProduct: updateProductHybrid,
     deleteProduct: deleteProductHybrid,
     getAllProducts: getAllProductsHybrid,
     getStats: getStatsHybrid,
     
-    // Alias para búsqueda (usa IndexedDB)
     searchProducts: window.DB.searchProducts,
     filterByCategory: window.DB.filterByCategory,
     getProductById: window.DB.getProductById,
     getProductByQR: window.DB.getProductByQR,
     
-    // Movimientos (usa IndexedDB por ahora)
     addMovement: window.DB.addMovement,
     getAllMovements: window.DB.getAllMovements,
-    
-    // Categorías
     getAllCategories: window.DB.getAllCategories
 };
 
 console.log('✅ sync.js cargado - Sistema híbrido listo');
-console.log('💡 Usa: window.SyncDB.addProduct(...)');
-console.log('💡 Usa: window.SyncDB.getAllProducts()');
-console.log('💡 Sincronización automática activada');

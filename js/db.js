@@ -39,6 +39,7 @@ async function initDB() {
                 productStore.createIndex('name', 'name', { unique: false });
                 productStore.createIndex('category', 'category', { unique: false });
                 productStore.createIndex('qrCode', 'qrCode', { unique: true });
+                productStore.createIndex('firestoreId', 'firestoreId', { unique: false });
                 productStore.createIndex('quantity', 'quantity', { unique: false });
                 
                 console.log('✅ Store "products" creado');
@@ -612,4 +613,38 @@ window.DB = {
     clearAllData
 };
 
+// Función de utilidad para limpiar duplicados
+window.cleanIndexedDB = async function() {
+    console.log('🧹 Limpiando duplicados de IndexedDB...');
+    try {
+        const products = await window.DB.getAllProducts();
+        const byFirestoreId = {};
+        let deleted = 0;
+        
+        products.forEach(p => {
+            if (p.firestoreId) {
+                if (!byFirestoreId[p.firestoreId]) {
+                    byFirestoreId[p.firestoreId] = [];
+                }
+                byFirestoreId[p.firestoreId].push(p);
+            }
+        });
+        
+        for (const [firestoreId, prods] of Object.entries(byFirestoreId)) {
+            if (prods.length > 1) {
+                prods.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+                for (let i = 1; i < prods.length; i++) {
+                    await window.DB.deleteProduct(prods[i].id);
+                    deleted++;
+                }
+            }
+        }
+        
+        console.log(`✅ Limpieza completada. ${deleted} duplicados eliminados`);
+    } catch (error) {
+        console.error('❌ Error limpiando:', error);
+    }
+};
+
 console.log('✅ db.js cargado - IndexedDB Manager listo');
+console.log('💡 Para limpiar duplicados manualmente, ejecuta: window.cleanIndexedDB()');

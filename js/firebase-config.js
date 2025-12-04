@@ -1,5 +1,5 @@
 /* ========================================
-   firebase-config.js
+   firebase-config.js - CORREGIDO
    Configuración Firebase - SOLO FIRESTORE
    ======================================== */
 
@@ -52,21 +52,50 @@ const COLLECTIONS = {
 };
 
 /* ========================================
+   UTILIDADES
+   ======================================== */
+function generateQRCode() {
+    return 'SP-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+}
+
+/* ========================================
    CRUD - PRODUCTOS (Firestore)
    ======================================== */
 
 // Crear Producto
 async function addProductToFirestore(product) {
     try {
+        // IMPORTANTE: Asegurar que tenga QR Code
+        if (!product.qrCode) {
+            product.qrCode = generateQRCode();
+            console.log('🔖 QR generado:', product.qrCode);
+        }
+        
+        // Preparar datos
         const productData = {
-            ...product,
+            name: product.name,
+            description: product.description || '',
+            price: product.price,
+            quantity: product.quantity,
+            category: product.category,
+            qrCode: product.qrCode, // ← CRÍTICO: Guardar QR
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         };
         
+        // Agregar a Firestore
         const docRef = await addDoc(collection(db, COLLECTIONS.PRODUCTS), productData);
+        
+        // IMPORTANTE: Actualizar el documento con su propio ID
+        await updateDoc(docRef, {
+            firestoreId: docRef.id
+        });
+        
         console.log('✅ Producto agregado a Firestore:', docRef.id);
+        console.log('   → QR Code:', product.qrCode);
+        
         return docRef.id;
+        
     } catch (error) {
         console.error('❌ Error al agregar a Firestore:', error);
         throw error;
@@ -80,14 +109,23 @@ async function getAllProductsFromFirestore() {
         const products = [];
         
         querySnapshot.forEach((doc) => {
+            const data = doc.data();
             products.push({
                 firestoreId: doc.id, // ID de Firestore
-                ...doc.data()
+                name: data.name,
+                description: data.description || '',
+                price: data.price,
+                quantity: data.quantity,
+                category: data.category,
+                qrCode: data.qrCode || generateQRCode(), // Generar si falta
+                createdAt: data.createdAt,
+                updatedAt: data.updatedAt
             });
         });
         
         console.log(`📦 ${products.length} productos obtenidos de Firestore`);
         return products;
+        
     } catch (error) {
         console.error('❌ Error al obtener productos:', error);
         return [];
@@ -101,9 +139,17 @@ async function getProductFromFirestore(firestoreId) {
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
+            const data = docSnap.data();
             return {
                 firestoreId: docSnap.id,
-                ...docSnap.data()
+                name: data.name,
+                description: data.description || '',
+                price: data.price,
+                quantity: data.quantity,
+                category: data.category,
+                qrCode: data.qrCode,
+                createdAt: data.createdAt,
+                updatedAt: data.updatedAt
             };
         } else {
             console.warn('⚠️ Producto no encontrado:', firestoreId);
@@ -120,14 +166,23 @@ async function updateProductInFirestore(firestoreId, updates) {
     try {
         const docRef = doc(db, COLLECTIONS.PRODUCTS, firestoreId);
         
+        // Preparar datos de actualización
         const updateData = {
-            ...updates,
             updatedAt: serverTimestamp()
         };
+        
+        // Solo agregar campos que existen en updates
+        if (updates.name !== undefined) updateData.name = updates.name;
+        if (updates.description !== undefined) updateData.description = updates.description;
+        if (updates.price !== undefined) updateData.price = updates.price;
+        if (updates.quantity !== undefined) updateData.quantity = updates.quantity;
+        if (updates.category !== undefined) updateData.category = updates.category;
+        if (updates.qrCode !== undefined) updateData.qrCode = updates.qrCode;
         
         await updateDoc(docRef, updateData);
         console.log('✅ Producto actualizado en Firestore:', firestoreId);
         return true;
+        
     } catch (error) {
         console.error('❌ Error al actualizar producto:', error);
         throw error;
@@ -178,9 +233,17 @@ async function filterProductsByCategory(category) {
         const products = [];
         
         querySnapshot.forEach((doc) => {
+            const data = doc.data();
             products.push({
                 firestoreId: doc.id,
-                ...doc.data()
+                name: data.name,
+                description: data.description || '',
+                price: data.price,
+                quantity: data.quantity,
+                category: data.category,
+                qrCode: data.qrCode,
+                createdAt: data.createdAt,
+                updatedAt: data.updatedAt
             });
         });
         
@@ -280,6 +343,38 @@ async function getStatsFromFirestore() {
 }
 
 /* ========================================
+   UTILIDADES DE MANTENIMIENTO
+   ======================================== */
+
+// Arreglar productos existentes sin QR Code
+async function fixMissingQRCodes() {
+    try {
+        console.log('🔧 Reparando productos sin QR Code...');
+        
+        const products = await getAllProductsFromFirestore();
+        let fixed = 0;
+        
+        for (const product of products) {
+            if (!product.qrCode) {
+                const newQR = generateQRCode();
+                await updateProductInFirestore(product.firestoreId, {
+                    qrCode: newQR
+                });
+                fixed++;
+                console.log(`✅ QR agregado a: ${product.name} → ${newQR}`);
+            }
+        }
+        
+        console.log(`✅ Reparación completa: ${fixed} productos actualizados`);
+        return fixed;
+        
+    } catch (error) {
+        console.error('❌ Error en reparación:', error);
+        return 0;
+    }
+}
+
+/* ========================================
    Exportar API
    ======================================== */
 window.FirebaseDB = {
@@ -303,6 +398,9 @@ window.FirebaseDB = {
     // Estadísticas
     getStats: getStatsFromFirestore,
     
+    // Utilidades
+    fixMissingQRCodes: fixMissingQRCodes,
+    
     // Colecciones
     COLLECTIONS
 };
@@ -310,4 +408,4 @@ window.FirebaseDB = {
 console.log('✅ Firebase API lista para usar');
 console.log('💡 Usa: window.FirebaseDB.addProduct(...)');
 console.log('💡 Usa: window.FirebaseDB.getAllProducts()');
-console.log('💡 Usa: window.FirebaseDB.getStats()');
+console.log('💡 Para reparar productos sin QR: window.FirebaseDB.fixMissingQRCodes()');

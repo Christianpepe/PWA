@@ -1,5 +1,5 @@
 /* ========================================
-   productos.js - Lógica CRUD de Productos
+   productos.js - Lógica CRUD de Productos (CORREGIDO)
    ======================================== */
 
 let currentProductId = null;
@@ -23,10 +23,15 @@ async function initProductos() {
         // Inicializar sistema de sincronización híbrido
         await window.SyncDB.init();
         
+        // IMPORTANTE: Limpiar duplicados ANTES de cargar
+        if (typeof window.cleanIndexedDB === 'function') {
+            await window.cleanIndexedDB();
+        }
+        
         // Cargar categorías
         await loadCategories();
         
-        // Cargar productos
+        // Cargar productos (SIN sincronizar automáticamente)
         await loadProducts();
         
         // Setup event listeners
@@ -79,12 +84,24 @@ async function loadCategories() {
 
 async function loadProducts(filter = '') {
     try {
-        // Obtener productos según filtro
+        console.log('📦 Cargando productos...');
+        
+        // CRÍTICO: NO sincronizar en cada carga, solo obtener datos locales
+        // La sincronización debe ser manual o cuando se restaura conexión
+        
+        // Limpiar duplicados PRIMERO
+        if (typeof window.cleanIndexedDB === 'function') {
+            await window.cleanIndexedDB();
+        }
+        
+        // Obtener productos según filtro (SOLO DE INDEXEDDB)
         if (filter) {
             allProducts = await window.SyncDB.filterByCategory(filter);
         } else {
             allProducts = await window.SyncDB.getAllProducts();
         }
+        
+        console.log(`📦 ${allProducts.length} productos cargados`);
         
         // Renderizar
         renderProducts(allProducts);
@@ -111,8 +128,26 @@ function renderProducts(products) {
     // Ocultar empty state
     if (emptyState) emptyState.classList.add('hidden');
     
-    // Renderizar productos
-    container.innerHTML = products.map(product => createProductCard(product)).join('');
+    // CRÍTICO: Eliminar duplicados por ID antes de renderizar
+    const uniqueProducts = [];
+    const seenIds = new Set();
+    
+    products.forEach(product => {
+        // Usar firestoreId como identificador único (o ID local si no tiene)
+        const uniqueId = product.firestoreId || product.id;
+        
+        if (!seenIds.has(uniqueId)) {
+            seenIds.add(uniqueId);
+            uniqueProducts.push(product);
+        } else {
+            console.warn('⚠️ Producto duplicado detectado (ignorado):', product.name);
+        }
+    });
+    
+    console.log(`📊 Renderizando ${uniqueProducts.length} productos únicos (de ${products.length} totales)`);
+    
+    // Renderizar productos únicos
+    container.innerHTML = uniqueProducts.map(product => createProductCard(product)).join('');
     
     // Agregar event listeners a las tarjetas
     container.querySelectorAll('.product-card').forEach(card => {
@@ -320,7 +355,7 @@ async function saveProduct(event) {
             }
         }
         
-        // Recargar lista
+        // Recargar lista (sin sincronizar de nuevo)
         await loadProducts();
         
         // Cerrar modal
@@ -447,6 +482,7 @@ function setupSearch() {
             if (query.length === 0) {
                 // Mostrar todos
                 renderProducts(allProducts);
+                updateProductCount(allProducts.length);
             } else if (query.length >= 2) {
                 // Buscar
                 const results = await window.SyncDB.searchProducts(query);

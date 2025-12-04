@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+    <!-- La navbar y footer se inyectarán aquí automáticamente -->
+
     <div class="container main-content">
         <div class="section-title">Movimientos</div>
 
@@ -63,7 +65,27 @@
     <script src="js/db.js"></script>
     <script type="module" src="js/firebase-config.js"></script>
     <script src="js/sync.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/components.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/movimientos.js"></script>
+    <script>
+        // Inyectar componentes globales cuando el DOM esté listo
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                window.Components.initComponents({ 
+                    title: 'Movimientos',
+                    showBack: true,
+                    backUrl: 'home.html'
+                });
+            });
+        } else {
+            window.Components.initComponents({ 
+                title: 'Movimientos',
+                showBack: true,
+                backUrl: 'home.html'
+            });
+        }
+    </script>
 </body>
 </html>

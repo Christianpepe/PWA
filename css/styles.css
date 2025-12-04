@@ -622,3 +622,152 @@ body {
 .movement-type.salida { background: rgba(239,68,68,0.08); color: var(--color-danger); }
 
 .movement-qty { font-weight:700; color: var(--text-primary); }
+
+/* ========================================
+   COMPONENTES GLOBALES - Navbar y Footer
+   ======================================== */
+
+/* Navbar */
+.navbar-start {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.navbar-end {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.logo-text {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.btn-logout {
+    color: var(--color-danger);
+    transition: all 0.2s ease;
+}
+
+.btn-logout:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: var(--color-danger);
+}
+
+/* Footer */
+.footer {
+    background-color: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
+    margin-top: var(--spacing-xl);
+    padding: var(--spacing-lg) var(--spacing-md);
+}
+
+.footer-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.footer-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.footer-section h4 {
+    font-size: var(--font-size-lg);
+    color: var(--color-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.footer-section h5 {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.footer-section p {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.footer-section ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.footer-section ul li a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+    transition: color 0.2s ease;
+}
+
+.footer-section ul li a:hover {
+    color: var(--color-primary);
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--color-danger);
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.online {
+    background-color: var(--color-secondary);
+}
+
+.status-indicator.offline {
+    background-color: var(--color-danger);
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.footer-bottom {
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.footer-bottom p {
+    font-size: var(--font-size-sm);
+    color: var(--text-light);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .footer-content {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .header-content {
+        flex-wrap: wrap;
+    }
+}
