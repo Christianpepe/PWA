@@ -37,6 +37,16 @@ async function initProductos() {
         // Setup event listeners
         setupEventListeners();
         
+        // Verificar si viene del escaneo
+        const urlParams = new URLSearchParams(window.location.search);
+        const editId = urlParams.get('edit');
+        if (editId) {
+            const productId = parseInt(editId);
+            editProduct(productId);
+        }
+        
+        console.log('✅ Módulo de productos listo (Híbrido: IndexedDB + Firestore)');
+        
         console.log('✅ Módulo de productos listo (Híbrido: IndexedDB + Firestore)');
         
     } catch (error) {
