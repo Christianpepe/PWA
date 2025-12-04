@@ -35,11 +35,22 @@ async function initHome() {
         
         console.log('✅ Usuario autenticado:', appState.user?.name);
         
+        // Inicializar IndexedDB
+        try {
+            await initDB();
+            console.log('✅ Base de datos inicializada');
+        } catch (error) {
+            console.warn('⚠️ Error inicializando DB:', error);
+        }
+        
         // Cargar datos
         loadUserData();
         await loadDashboardStats();
         setupEventListeners();
         setupConnectionMonitor();
+        
+        // Recargar estadísticas periódicamente
+        setupStatsRefresh();
         
         console.log('✅ Dashboard listo!');
         console.log('💡 Abre DevTools y prueba las funcionalidades');
@@ -89,16 +100,8 @@ async function loadDashboardStats() {
     try {
         console.log('📊 Cargando estadísticas...');
         
-        // Simular delay de red
-        await delay(500);
-        
-        // Datos simulados
-        const stats = {
-            totalProducts: 127,
-            totalStock: 3450,
-            lowStock: 8,
-            todayMovements: 15
-        };
+        // Obtener estadísticas reales de la BD
+        const stats = await getStats();
         
         appState.stats = stats;
         updateStatsUI(stats);
@@ -107,6 +110,14 @@ async function loadDashboardStats() {
         
     } catch (error) {
         console.error('❌ Error cargando stats:', error);
+        // Mostrar valores por defecto en caso de error
+        const defaultStats = {
+            totalProducts: 0,
+            totalStock: 0,
+            lowStock: 0,
+            todayMovements: 0
+        };
+        updateStatsUI(defaultStats);
     }
 }
 
@@ -162,6 +173,33 @@ function updateNotificationBadge(count) {
 /* ========================================
    Event Listeners
    ======================================== */
+function setupStatsRefresh() {
+    // Recargar estadísticas cada 30 segundos
+    setInterval(async () => {
+        try {
+            console.log('🔄 Actualizando estadísticas...');
+            const stats = await getStats();
+            
+            // Solo actualizar si hay cambios
+            if (JSON.stringify(appState.stats) !== JSON.stringify(stats)) {
+                appState.stats = stats;
+                updateStatsUI(stats);
+                console.log('✅ Estadísticas actualizadas:', stats);
+            }
+        } catch (error) {
+            console.warn('⚠️ Error actualizando estadísticas:', error);
+        }
+    }, 30000);
+    
+    // También actualizar cuando la página está visible
+    document.addEventListener('visibilitychange', async () => {
+        if (!document.hidden) {
+            console.log('👁️ Página visible - actualizando estadísticas');
+            await loadDashboardStats();
+        }
+    });
+}
+
 function setupEventListeners() {
     // Notificaciones
     const btnNotif = document.getElementById('btnNotifications');
@@ -177,20 +215,13 @@ function setupEventListeners() {
         console.log('✅ Listener: Logout');
     }
     
-    // Interceptar links (evitar 404)
+    // Vibración en links
     document.querySelectorAll('.action-card').forEach(card => {
-        card.addEventListener('click', (e) => {
-            e.preventDefault();
-            const href = card.getAttribute('href');
-            const title = card.querySelector('h4').textContent;
-            
+        card.addEventListener('click', () => {
             // Vibrar
             if ('vibrate' in navigator) {
                 navigator.vibrate(50);
             }
-            
-            console.log(`🔗 Click en: ${title} (${href})`);
-            alert(`📄 ${title}\n\nNavegando a: ${href}\n\n⚠️ Esta página aún no existe (404)\n\n💡 Por ahora solo funciona home.html`);
         });
     });
     
