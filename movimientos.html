@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Registro de movimientos - SafeProducts">
+    <meta name="theme-color" content="#2563eb">
+    <title>Movimientos - SafeProducts</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192x192.png">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container main-content">
+        <div class="section-title">Movimientos</div>
+
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem;">
+            <div style="flex:1;min-width:320px;max-width:520px;">
+                <div class="stat-card">
+                    <div style="flex:1">
+                        <h3 style="margin-bottom:0.5rem">Registrar Movimiento</h3>
+                        <form id="movementForm">
+                            <div class="form-group">
+                                <label for="productSelect">Producto</label>
+                                <select id="productSelect" required style="width:100%;padding:0.6rem;border-radius:8px;border:1px solid var(--border-color);">
+                                    <option value="">— Selecciona un producto —</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="movementType">Tipo</label>
+                                <select id="movementType" required style="width:100%;padding:0.6rem;border-radius:8px;border:1px solid var(--border-color);">
+                                    <option value="entrada">Entrada</option>
+                                    <option value="salida">Salida</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="movementQty">Cantidad</label>
+                                <input type="number" id="movementQty" min="1" value="1" required style="width:100%;padding:0.6rem;border-radius:8px;border:1px solid var(--border-color);">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="movementNote">Nota (opcional)</label>
+                                <input type="text" id="movementNote" placeholder="Ej: Recepción de proveedor" style="width:100%;padding:0.6rem;border-radius:8px;border:1px solid var(--border-color);">
+                            </div>
+
+                            <div id="movementError" class="error-message hidden"></div>
+
+                            <button id="btnSaveMovement" class="btn-primary" type="submit">Registrar Movimiento</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div style="flex:2;min-width:320px;">
+                <div class="section-title">Historial</div>
+                <div id="movementsList" style="margin-top:0.75rem"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/db.js"></script>
+    <script type="module" src="js/firebase-config.js"></script>
+    <script src="js/sync.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/movimientos.js"></script>
+</body>
+</html>

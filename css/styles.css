@@ -429,3 +429,196 @@ body {
         padding-top: env(safe-area-inset-top);
     }
 }
+
+/* ========================================
+   Auth (Login / Registro) Styles
+   ======================================== */
+.auth-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(37,99,235,0.03) 40%, rgba(16,185,129,0.02) 100%);
+}
+
+.auth-container {
+    width: 100%;
+    max-width: 420px;
+    padding: 1.25rem;
+}
+
+.auth-card {
+    background: linear-gradient(180deg, var(--bg-primary), #fbfdff);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 10px 30px rgba(16,24,40,0.06);
+    border: 1px solid rgba(15,23,42,0.03);
+}
+
+.auth-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.auth-logo h1 {
+    font-size: 1.25rem;
+    color: var(--color-primary-dark);
+    font-weight: 800;
+}
+
+.auth-form h2 {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+    color: var(--text-primary);
+}
+
+.auth-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.auth-form .form-group {
+    margin-bottom: 0.85rem;
+}
+
+.auth-form label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.35rem;
+}
+
+.auth-form input[type="text"],
+.auth-form input[type="email"],
+.auth-form input[type="password"] {
+    width: 100%;
+    padding: 0.75rem 0.9rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-primary);
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.auth-form input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 6px 20px rgba(37,99,235,0.08);
+}
+
+.input-with-action {
+    position: relative;
+}
+
+.input-action-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    padding: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.btn-primary {
+    display: inline-block;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-primary-dark));
+    color: white;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(37,99,235,0.12);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+
+.btn-primary:active { transform: translateY(1px); }
+.btn-primary[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+.error-message {
+    background-color: rgba(239,68,68,0.08);
+    color: var(--color-danger);
+    border: 1px solid rgba(239,68,68,0.12);
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    margin-bottom: 0.6rem;
+}
+
+.auth-footer {
+    margin-top: 0.75rem;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.auth-link {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.9rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+#statusDot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-secondary);
+    box-shadow: 0 4px 12px rgba(16,185,129,0.12);
+}
+
+@media (max-width: 420px) {
+    .auth-container { padding: 0.75rem; }
+    .auth-card { padding: 1rem; }
+}
+
+/* Movements list */
+.movement-item {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow-sm);
+}
+
+.movement-meta {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.movement-type {
+    font-weight: 700;
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.movement-type.entrada { background: rgba(16,185,129,0.08); color: var(--color-secondary); }
+.movement-type.salida { background: rgba(239,68,68,0.08); color: var(--color-danger); }
+
+.movement-qty { font-weight:700; color: var(--text-primary); }
