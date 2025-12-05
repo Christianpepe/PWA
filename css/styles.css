@@ -1,49 +1,17 @@
-/* ========================================
-   Variables CSS
-   ======================================== */
+/* Theme tokens import (Modern Blue) */
+@import url('./theme.css');
+
+/* Fallback tokens and aliases */
 :root {
-    /* Colores principales */
-    --color-primary: #2563eb;
-    --color-primary-dark: #1e40af;
-    --color-secondary: #10b981;
-    --color-warning: #f59e0b;
-    --color-danger: #ef4444;
-    --color-purple: #8b5cf6;
-    
-    /* Colores de fondo */
-    --bg-primary: #ffffff;
-    --bg-secondary: #f9fafb;
-    --bg-dark: #1f2937;
-    
-    /* Colores de texto */
-    --text-primary: #111827;
-    --text-secondary: #6b7280;
-    --text-light: #9ca3af;
-    
-    /* Bordes */
-    --border-color: #e5e7eb;
-    --border-radius: 12px;
-    --border-radius-sm: 8px;
-    
-    /* Sombras */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    
-    /* Espaciado */
-    --spacing-xs: 0.5rem;
-    --spacing-sm: 1rem;
-    --spacing-md: 1.5rem;
-    --spacing-lg: 2rem;
-    --spacing-xl: 3rem;
-    
-    /* Tipografía */
-    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     --font-size-sm: 0.875rem;
     --font-size-base: 1rem;
     --font-size-lg: 1.125rem;
     --font-size-xl: 1.5rem;
     --font-size-2xl: 2rem;
+
+    --shadow-sm: var(--elevation-1);
+    --shadow-md: var(--elevation-2);
+    --shadow-lg: var(--elevation-3);
 }
 
 /* ========================================
@@ -438,7 +406,12 @@ body {
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    background: linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(37,99,235,0.03) 40%, rgba(16,185,129,0.02) 100%);
+    position: relative;
+    background-color: var(--color-muted);
+    background-image: url('../img/almacen-fondo.png');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
 }
 
 .auth-container {
@@ -448,11 +421,12 @@ body {
 }
 
 .auth-card {
-    background: linear-gradient(180deg, var(--bg-primary), #fbfdff);
+    background: rgba(255,255,255,0.94);
+    backdrop-filter: blur(6px);
     border-radius: 16px;
     padding: 1.5rem;
-    box-shadow: 0 10px 30px rgba(16,24,40,0.06);
-    border: 1px solid rgba(15,23,42,0.03);
+    box-shadow: 0 10px 30px rgba(2,6,23,0.12);
+    border: 1px solid rgba(2,6,23,0.04);
 }
 
 .auth-logo {
@@ -460,6 +434,13 @@ body {
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 0.5rem;
+}
+
+.auth-logo img.auth-logo-img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    display: block;
 }
 
 .auth-logo h1 {
@@ -771,3 +752,66 @@ body {
         flex-wrap: wrap;
     }
 }
+
+/* Accessibility & Utilities */
+*:focus { outline: none; }
+
+*:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: calc(var(--border-radius-sm) - 2px);
+}
+
+#loadingIndicator {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-primary-400));
+    color: white;
+    padding: 0.75rem;
+    text-align: center;
+    font-weight: 500;
+    z-index: 9999;
+    box-shadow: var(--elevation-2);
+}
+
+.toast {
+    position: fixed;
+    right: 1rem;
+    bottom: 1.25rem;
+    background: var(--color-surface);
+    color: var(--color-on-surface);
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    box-shadow: var(--elevation-2);
+    border: 1px solid var(--border-color);
+    z-index: 10000;
+}
+
+.toast.error-toast {
+    background: linear-gradient(90deg, rgba(239,68,68,0.95), rgba(239,68,68,0.9));
+    color: white;
+    border: none;
+}
+
+.toast.toast-success {
+    background: linear-gradient(90deg, rgba(16,185,129,0.95), rgba(16,185,129,0.9));
+    color: white;
+    border: none;
+}
+
+.toast.fade-out { opacity: 0; transform: translateY(6px); transition: opacity 300ms var(--motion-ease), transform 300ms var(--motion-ease); }
+
+.btn-ghost {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--color-primary);
+}
+
+.btn-primary { background: linear-gradient(90deg, var(--color-primary), var(--color-primary-600)); color: white; box-shadow: 0 8px 24px rgba(37,99,235,0.12); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.text-center { text-align: center; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+

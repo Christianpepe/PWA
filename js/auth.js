@@ -520,6 +520,11 @@ async function initRegister() {
    Utilidades de UI
    ======================================== */
 function showError(message) {
+    if (window.UI && typeof window.UI.showError === 'function') {
+        window.UI.showError(message);
+        return;
+    }
+
     const errorDiv = document.getElementById('errorMessage');
     if (errorDiv) {
         errorDiv.textContent = message;

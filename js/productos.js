@@ -94,61 +94,66 @@ async function initProductos() {
    Indicadores de Carga
    ======================================== */
 function showLoadingIndicator() {
+    if (window.UI && typeof window.UI.showLoadingIndicator === 'function') {
+        window.UI.showLoadingIndicator();
+        return;
+    }
+
+    // Fallback: create a loading indicator element (uses CSS .spinner)
+    if (document.getElementById('loadingIndicator')) return;
     const indicator = document.createElement('div');
     indicator.id = 'loadingIndicator';
-    indicator.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
-        color: white;
-        padding: 0.75rem;
-        text-align: center;
-        font-weight: 500;
-        z-index: 9999;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    `;
+    indicator.setAttribute('role', 'status');
+    indicator.setAttribute('aria-live', 'polite');
     indicator.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
-            <div style="width: 16px; height: 16px; border: 2px solid white; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:.5rem;">
+            <div class="spinner" aria-hidden="true"></div>
             <span>Sincronizando productos...</span>
         </div>
-        <style>
-            @keyframes spin {
-                to { transform: rotate(360deg); }
-            }
-        </style>
     `;
     document.body.appendChild(indicator);
 }
 
 function hideLoadingIndicator() {
-    const indicator = document.getElementById('loadingIndicator');
-    if (indicator) {
-        indicator.remove();
+    if (window.UI && typeof window.UI.hideLoadingIndicator === 'function') {
+        window.UI.hideLoadingIndicator();
+        return;
     }
+
+    const indicator = document.getElementById('loadingIndicator');
+    if (indicator) indicator.remove();
 }
 
 function showError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = `
-        position: fixed;
-        top: 1rem;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #ef4444;
-        color: white;
-        padding: 1rem 1.5rem;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        z-index: 9999;
-        max-width: 90%;
-    `;
-    errorDiv.textContent = message;
-    document.body.appendChild(errorDiv);
-    
-    setTimeout(() => errorDiv.remove(), 5000);
+    if (window.UI && typeof window.UI.showError === 'function') {
+        window.UI.showError(message);
+        return;
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast error-toast';
+    toast.setAttribute('role', 'alert');
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.classList.add('fade-out'), 320);
+    setTimeout(() => toast.remove(), 6000);
+}
+
+function showSuccess(message) {
+    if (window.UI && typeof window.UI.showSuccess === 'function') {
+        window.UI.showSuccess(message);
+        return;
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-success';
+    toast.setAttribute('role', 'status');
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.classList.add('fade-out'), 320);
+    setTimeout(() => toast.remove(), 3600);
 }
 
 /* ========================================
@@ -355,6 +360,8 @@ function openAddModal() {
     document.getElementById('productQR').value = '';
     
     document.getElementById('productModal').classList.remove('hidden');
+    // Lock background scroll when modal is open
+    document.body.classList.add('modal-open');
     
     // Vibrar
     if ('vibrate' in navigator) {
@@ -399,6 +406,7 @@ async function editProduct(id) {
 function closeModal() {
     document.getElementById('productModal').classList.add('hidden');
     currentProductId = null;
+    document.body.classList.remove('modal-open');
 }
 
 /* ========================================
@@ -547,6 +555,7 @@ async function viewProductDetails(id) {
         
         // Mostrar modal
         document.getElementById('detailsModal').classList.remove('hidden');
+        document.body.classList.add('modal-open');
         
         // Vibrar
         if ('vibrate' in navigator) {
@@ -561,6 +570,7 @@ async function viewProductDetails(id) {
 
 function closeDetailsModal() {
     document.getElementById('detailsModal').classList.add('hidden');
+    document.body.classList.remove('modal-open');
 }
 
 /* ========================================

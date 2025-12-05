@@ -221,25 +221,32 @@ function displayProduct(product) {
    Mensajes
    ======================================== */
 function showError(message) {
+    // Use global UI helper if available
+    if (window.UI && typeof window.UI.showError === 'function') {
+        window.UI.showError(message);
+        return;
+    }
+
     const errorElement = document.getElementById('errorMessage');
-    errorElement.textContent = message;
-    errorElement.classList.remove('hidden');
-    
-    // Ocultar después de 5 segundos
-    setTimeout(() => {
-        errorElement.classList.add('hidden');
-    }, 5000);
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.classList.remove('hidden');
+        setTimeout(() => errorElement.classList.add('hidden'), 5000);
+    }
 }
 
 function showSuccess(message) {
+    if (window.UI && typeof window.UI.showSuccess === 'function') {
+        window.UI.showSuccess(message);
+        return;
+    }
+
     const successElement = document.getElementById('successMessage');
-    successElement.textContent = message;
-    successElement.classList.remove('hidden');
-    
-    // Ocultar después de 3 segundos
-    setTimeout(() => {
-        successElement.classList.add('hidden');
-    }, 3000);
+    if (successElement) {
+        successElement.textContent = message;
+        successElement.classList.remove('hidden');
+        setTimeout(() => successElement.classList.add('hidden'), 3000);
+    }
 }
 
 function showEmptyState() {
