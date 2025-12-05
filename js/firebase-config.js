@@ -5,12 +5,12 @@
 
 // Configuración de tu proyecto Firebase
 const firebaseConfig = {
-    apiKey: "AIzaSyAEZco1Ninx67P4bizFu-JawcwZNuL5Y-c",
-    authDomain: "safe-products-pwa.firebaseapp.com",
-    projectId: "safe-products-pwa",
-    storageBucket: "safe-products-pwa.firebasestorage.app",
-    messagingSenderId: "541256329730",
-    appId: "1:541256329730:web:a0d43922809be2dd53151b"
+    apiKey: "...",
+    authDomain: "...",
+    projectId: "...",
+    storageBucket: "...",
+    messagingSenderId: "...",
+    appId: "..."
 };
 
 /* ========================================
