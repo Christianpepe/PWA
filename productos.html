@@ -14,7 +14,8 @@
     <link rel="stylesheet" href="css/productos.css">
 </head>
 <body>
-    <!-- La navbar y footer se inyectarán aquí automáticamente -->
+    <!-- Navbar -->
+    <nav id="navbar"></nav>
 
     <!-- Main Content -->
     <main class="main-content">
@@ -49,7 +50,7 @@
                         <h2>Inventario</h2>
                         <span id="productCount" class="count-badge">0 productos</span>
                     </div>
-                    <button class="btn-primary" onclick="openAddModal()">
+                    <button class="btn-primary" id="btnAddProduct">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="display: inline; margin-right: 8px;">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
                             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -78,6 +79,9 @@
 
         </div>
     </main>
+
+    <!-- Footer -->
+    <footer id="footer"></footer>
 
     <!-- Modal: Agregar/Editar Producto -->
     <div id="productModal" class="modal hidden">
@@ -227,37 +231,37 @@
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts en ORDEN CORRECTO -->
+    <script src="js/offline-handler.js"></script>
     <script src="js/db.js"></script>
-    <script src="js/ui.js"></script>
     <script type="module" src="js/firebase-config.js"></script>
     <script src="js/sync.js"></script>
+    <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
     <script src="js/components.js"></script>
     <script src="libs/qrcode.min.js"></script>
     <script src="js/productos.js"></script>
+    
     <script>
-        // Inyectar componentes globales cuando el DOM esté listo
+        // Inicializar componentes
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
+                if (window.Components && typeof window.Components.initComponents === 'function') {
+                    window.Components.initComponents({ 
+                        title: 'Productos',
+                        showBack: true,
+                        backUrl: 'home.html'
+                    });
+                }
+            });
+        } else {
+            if (window.Components && typeof window.Components.initComponents === 'function') {
                 window.Components.initComponents({ 
                     title: 'Productos',
                     showBack: true,
                     backUrl: 'home.html'
                 });
-                
-                // Inicializar productos con espera a Firebase
-                initProductos();
-            });
-        } else {
-            window.Components.initComponents({ 
-                title: 'Productos',
-                showBack: true,
-                backUrl: 'home.html'
-            });
-            
-            // Inicializar productos con espera a Firebase
-            initProductos();
+            }
         }
     </script>
 </body>

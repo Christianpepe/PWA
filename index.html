@@ -6,7 +6,7 @@
     <meta name="description" content="SafeProducts - Sistema de Inventario PWA">
     <meta name="theme-color" content="#2563eb">
     
-    <title>SafeProducts - Cargando...</title>
+    <title>SafeProducts</title>
     
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192x192.png">
@@ -45,9 +45,10 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
         
-        .logo svg {
-            width: 80px;
-            height: 80px;
+        .logo-text {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #2563eb;
         }
         
         h1 {
@@ -93,10 +94,7 @@
 <body>
     <div class="splash-container">
         <div class="logo">
-            <svg viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="8" fill="#2563eb"/>
-                <path d="M16 8L20 12H18V20H14V12H12L16 8Z" fill="white"/>
-            </svg>
+            <div class="logo-text">SP</div>
         </div>
         <h1>SafeProducts</h1>
         <p>Sistema de Inventario Inteligente</p>
@@ -104,16 +102,20 @@
     </div>
 
     <script>
+        // Registrar Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('✅ SW registrado:', reg.scope))
+                .catch(err => console.warn('⚠️ SW error:', err));
+        }
+        
         // Auto-redirección después de 1.5 segundos
         setTimeout(() => {
-            // Verificar si hay sesión
             const userData = localStorage.getItem('user');
             
             if (userData) {
-                // Usuario autenticado → Dashboard
                 window.location.href = 'home.html';
             } else {
-                // No autenticado → Login
                 window.location.href = 'login.html';
             }
         }, 1500);

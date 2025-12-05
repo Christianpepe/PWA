@@ -1,14 +1,12 @@
 /* ========================================
-   auth.js - Sistema de Autenticación
-   Sin Firebase Auth - Solo Firestore
+   auth.js - CORREGIDO PARA OFFLINE
+   Autenticación que funciona sin conexión
    ======================================== */
 
 /* ========================================
-   Utilidades de Hash (simple para proyecto escolar)
+   Hash Simple (para proyecto escolar)
    ======================================== */
 async function simpleHash(text) {
-    // Para producción, usar una librería como bcrypt o crypto
-    // Por simplicidad, usamos btoa (Base64) + salt
     const salt = 'SafeProducts2025';
     return btoa(text + salt);
 }
@@ -19,18 +17,16 @@ async function verifyHash(text, hash) {
 }
 
 /* ========================================
-   Funciones de Firestore para Usuarios
+   FIRESTORE - Solo si hay conexión
    ======================================== */
-
-// Crear usuario en Firestore
 async function createUserInFirestore(userData) {
-    try {
-        // Verificar que FirebaseDB esté disponible
-        if (!window.FirebaseDB || !window.FirebaseDB.db) {
-            throw new Error('Firebase no inicializado');
-        }
+    // CRÍTICO: Solo intentar si hay conexión
+    if (!navigator.onLine || !window.FirebaseDB) {
+        console.log('📴 Offline - Usuario no se creará en Firestore ahora');
+        return null;
+    }
 
-        // Importar funciones dinámicamente desde firebase-config
+    try {
         const { collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
         
         const userDoc = {
@@ -50,18 +46,18 @@ async function createUserInFirestore(userData) {
         return docRef.id;
         
     } catch (error) {
-        console.error('❌ Error al crear usuario en Firestore:', error);
-        throw error;
+        console.warn('⚠️ Error creando usuario en Firestore:', error);
+        return null;
     }
 }
 
-// Buscar usuario por email en Firestore
 async function findUserByEmailInFirestore(email) {
-    try {
-        if (!window.FirebaseDB || !window.FirebaseDB.db) {
-            throw new Error('Firebase no inicializado');
-        }
+    if (!navigator.onLine || !window.FirebaseDB) {
+        console.log('📴 Offline - No se puede buscar en Firestore');
+        return null;
+    }
 
+    try {
         const { collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
         
         const q = query(
@@ -82,16 +78,15 @@ async function findUserByEmailInFirestore(email) {
         };
         
     } catch (error) {
-        console.error('❌ Error al buscar usuario:', error);
-        throw error;
+        console.warn('⚠️ Error buscando usuario en Firestore:', error);
+        return null;
     }
 }
 
-// Actualizar último login
 async function updateLastLogin(firestoreId) {
-    try {
-        if (!window.FirebaseDB || !window.FirebaseDB.db) return;
+    if (!navigator.onLine || !window.FirebaseDB) return;
 
+    try {
         const { doc, updateDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
         
         const userRef = doc(window.FirebaseDB.db, 'users', firestoreId);
@@ -102,97 +97,97 @@ async function updateLastLogin(firestoreId) {
         console.log('✅ Último login actualizado');
         
     } catch (error) {
-        console.error('⚠️ Error al actualizar último login:', error);
+        console.warn('⚠️ Error al actualizar último login:', error);
     }
 }
 
 /* ========================================
-   Funciones de IndexedDB para Usuarios
+   INDEXEDDB - OFFLINE FIRST
    ======================================== */
-
-// Crear/actualizar usuario en IndexedDB local
 async function saveUserLocally(userData) {
     try {
-        // Asegurarse de que IndexedDB esté inicializado
-        if (!window.DB) {
-            console.error('❌ IndexedDB no disponible');
+        // CRÍTICO: Esperar a que IndexedDB esté listo
+        if (!window.DB || typeof window.DB.init !== 'function') {
+            console.warn('⚠️ IndexedDB no disponible para guardar usuario');
             return;
         }
         
         const db = await window.DB.init();
         
-        // Verificar si el store existe
         if (!db.objectStoreNames.contains('users')) {
-            console.error('❌ Store "users" no existe en IndexedDB');
+            console.warn('⚠️ Store "users" no existe');
             return;
         }
         
-        const transaction = db.transaction(['users'], 'readwrite');
-        const store = transaction.objectStore('users');
-        
-        // Buscar si ya existe
-        const index = store.index('email');
-        const existingRequest = index.get(userData.email.toLowerCase());
-        
-        existingRequest.onsuccess = () => {
-            const existing = existingRequest.result;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['users'], 'readwrite');
+            const store = transaction.objectStore('users');
+            const index = store.index('email');
             
-            if (existing) {
-                // Actualizar
-                const updatedUser = { ...existing, ...userData };
-                const updateRequest = store.put(updatedUser);
+            const searchRequest = index.get(userData.email.toLowerCase());
+            
+            searchRequest.onsuccess = () => {
+                const existing = searchRequest.result;
                 
-                updateRequest.onsuccess = () => {
-                    console.log('✅ Usuario actualizado localmente');
-                };
-                
-                updateRequest.onerror = () => {
-                    console.error('❌ Error al actualizar usuario:', updateRequest.error);
-                };
-            } else {
-                // Crear nuevo
-                const addRequest = store.add(userData);
-                
-                addRequest.onsuccess = () => {
-                    console.log('✅ Usuario guardado localmente');
-                };
-                
-                addRequest.onerror = () => {
-                    console.error('❌ Error al guardar usuario:', addRequest.error);
-                };
-            }
-        };
-        
-        existingRequest.onerror = () => {
-            console.error('❌ Error al buscar usuario existente:', existingRequest.error);
-        };
+                if (existing) {
+                    // Actualizar
+                    const updatedUser = { ...existing, ...userData };
+                    const updateRequest = store.put(updatedUser);
+                    
+                    updateRequest.onsuccess = () => {
+                        console.log('✅ Usuario actualizado localmente');
+                        resolve(updatedUser);
+                    };
+                    
+                    updateRequest.onerror = () => {
+                        console.error('❌ Error actualizando usuario:', updateRequest.error);
+                        reject(updateRequest.error);
+                    };
+                } else {
+                    // Crear nuevo
+                    const addRequest = store.add(userData);
+                    
+                    addRequest.onsuccess = () => {
+                        console.log('✅ Usuario guardado localmente');
+                        resolve(userData);
+                    };
+                    
+                    addRequest.onerror = () => {
+                        console.error('❌ Error guardando usuario:', addRequest.error);
+                        reject(addRequest.error);
+                    };
+                }
+            };
+            
+            searchRequest.onerror = () => {
+                console.error('❌ Error buscando usuario:', searchRequest.error);
+                reject(searchRequest.error);
+            };
+        });
         
     } catch (error) {
         console.error('❌ Error en saveUserLocally:', error);
     }
 }
 
-// Buscar usuario por email en IndexedDB
 async function findUserLocallyByEmail(email) {
     try {
-        if (!window.DB) {
-            console.error('❌ IndexedDB no disponible');
+        if (!window.DB || typeof window.DB.init !== 'function') {
+            console.warn('⚠️ IndexedDB no disponible');
             return null;
         }
         
         const db = await window.DB.init();
         
-        // Verificar si el store existe
         if (!db.objectStoreNames.contains('users')) {
-            console.warn('⚠️ Store "users" no existe en IndexedDB');
+            console.warn('⚠️ Store "users" no existe');
             return null;
         }
         
-        const transaction = db.transaction(['users'], 'readonly');
-        const store = transaction.objectStore('users');
-        const index = store.index('email');
-        
         return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['users'], 'readonly');
+            const store = transaction.objectStore('users');
+            const index = store.index('email');
             const request = index.get(email.toLowerCase());
             
             request.onsuccess = () => {
@@ -200,7 +195,7 @@ async function findUserLocallyByEmail(email) {
             };
             
             request.onerror = () => {
-                console.error('❌ Error al buscar usuario:', request.error);
+                console.error('❌ Error buscando usuario:', request.error);
                 reject(request.error);
             };
         });
@@ -212,13 +207,13 @@ async function findUserLocallyByEmail(email) {
 }
 
 /* ========================================
-   REGISTRO DE USUARIO
+   REGISTRO - OFFLINE FIRST
    ======================================== */
 async function registerUser(name, email, password) {
     try {
-        console.log('📝 Iniciando registro de usuario...');
+        console.log('📝 Iniciando registro...');
         
-        // Validaciones básicas
+        // Validaciones
         if (!name || name.length < 3) {
             throw new Error('El nombre debe tener al menos 3 caracteres');
         }
@@ -231,13 +226,12 @@ async function registerUser(name, email, password) {
             throw new Error('La contraseña debe tener al menos 6 caracteres');
         }
         
-        // Verificar si el usuario ya existe
-        let existingUser = null;
+        // CRÍTICO: Buscar PRIMERO localmente
+        let existingUser = await findUserLocallyByEmail(email);
         
-        if (navigator.onLine && window.FirebaseDB) {
+        // Si hay conexión, verificar también en Firestore
+        if (!existingUser && navigator.onLine && window.FirebaseDB) {
             existingUser = await findUserByEmailInFirestore(email);
-        } else {
-            existingUser = await findUserLocallyByEmail(email);
         }
         
         if (existingUser) {
@@ -254,21 +248,28 @@ async function registerUser(name, email, password) {
             createdAt: new Date().toISOString()
         };
         
-        // Guardar en Firestore si hay conexión
+        // 1. SIEMPRE guardar localmente PRIMERO
+        await saveUserLocally(userData);
+        console.log('✅ Usuario guardado localmente');
+        
+        // 2. Intentar guardar en Firestore SOLO si hay conexión
         if (navigator.onLine && window.FirebaseDB) {
             try {
                 const firestoreId = await createUserInFirestore(userData);
-                userData.firestoreId = firestoreId;
-                console.log('✅ Usuario registrado en Firestore');
+                if (firestoreId) {
+                    userData.firestoreId = firestoreId;
+                    // Actualizar el usuario local con el firestoreId
+                    await saveUserLocally(userData);
+                    console.log('✅ Usuario registrado en Firestore');
+                }
             } catch (error) {
-                console.warn('⚠️ No se pudo registrar en Firestore, solo local:', error);
+                console.warn('⚠️ Usuario guardado solo localmente (sin Firestore)');
             }
+        } else {
+            console.log('📴 Offline - Usuario guardado solo localmente');
         }
         
-        // Guardar localmente
-        await saveUserLocally(userData);
-        
-        console.log('✅ Usuario registrado exitosamente');
+        console.log('✅ Registro exitoso');
         return userData;
         
     } catch (error) {
@@ -278,36 +279,32 @@ async function registerUser(name, email, password) {
 }
 
 /* ========================================
-   LOGIN DE USUARIO
+   LOGIN - OFFLINE FIRST
    ======================================== */
 async function loginUser(email, password) {
     try {
-        console.log('🔐 Iniciando inicio de sesión...');
+        console.log('🔐 Iniciando login...');
         
-        // Validaciones
         if (!email || !password) {
             throw new Error('Por favor completa todos los campos');
         }
         
-        let user = null;
+        // 1. SIEMPRE buscar PRIMERO localmente
+        let user = await findUserLocallyByEmail(email);
         
-        // Intentar buscar en Firestore primero si hay conexión
+        // 2. Si hay conexión, también buscar en Firestore (y actualizar local)
         if (navigator.onLine && window.FirebaseDB) {
             try {
-                user = await findUserByEmailInFirestore(email);
+                const firestoreUser = await findUserByEmailInFirestore(email);
                 
-                // Si lo encontramos, guardarlo localmente
-                if (user) {
-                    await saveUserLocally(user);
+                if (firestoreUser) {
+                    // Actualizar usuario local con datos de Firestore
+                    await saveUserLocally(firestoreUser);
+                    user = firestoreUser;
                 }
             } catch (error) {
-                console.warn('⚠️ No se pudo buscar en Firestore, intentando local');
+                console.warn('⚠️ Error buscando en Firestore, usando datos locales');
             }
-        }
-        
-        // Si no se encontró en Firestore, buscar localmente
-        if (!user) {
-            user = await findUserLocallyByEmail(email);
         }
         
         if (!user) {
@@ -321,8 +318,8 @@ async function loginUser(email, password) {
             throw new Error('Contraseña incorrecta');
         }
         
-        // Actualizar último login en Firestore
-        if (user.firestoreId && navigator.onLine) {
+        // Actualizar último login en Firestore (si hay conexión)
+        if (user.firestoreId && navigator.onLine && window.FirebaseDB) {
             await updateLastLogin(user.firestoreId);
         }
         
@@ -346,16 +343,13 @@ async function loginUser(email, password) {
 }
 
 /* ========================================
-   CERRAR SESIÓN
+   SESIÓN
    ======================================== */
 function logoutUser() {
     localStorage.removeItem('user');
     console.log('👋 Sesión cerrada');
 }
 
-/* ========================================
-   VERIFICAR SESIÓN
-   ======================================== */
 function getCurrentUser() {
     const userData = localStorage.getItem('user');
     if (!userData) return null;
@@ -377,21 +371,18 @@ function isAuthenticated() {
    UI - LOGIN
    ======================================== */
 async function initLogin() {
-    console.log('🔐 Inicializando página de login...');
+    console.log('🔐 Inicializando login...');
     
-    // Redirigir si ya está autenticado
     if (isAuthenticated()) {
-        console.log('✅ Usuario ya autenticado, redirigiendo...');
+        console.log('✅ Usuario autenticado, redirigiendo...');
         window.location.href = 'home.html';
         return;
     }
     
-    // Esperar a que se inicialicen las dependencias
+    // Esperar a que IndexedDB esté listo
     await waitForDependencies();
     
-    // Configurar formulario
     const form = document.getElementById('loginForm');
-    const errorMessage = document.getElementById('errorMessage');
     const btnLogin = document.getElementById('btnLogin');
     
     form.addEventListener('submit', async (e) => {
@@ -400,28 +391,23 @@ async function initLogin() {
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
         
-        // Limpiar error previo
         hideError();
         
-        // Deshabilitar botón
         btnLogin.disabled = true;
         btnLogin.textContent = 'Iniciando sesión...';
         
         try {
             await loginUser(email, password);
             
-            // Vibrar éxito
             if ('vibrate' in navigator) {
                 navigator.vibrate(200);
             }
             
-            // Redirigir
             window.location.href = 'home.html';
             
         } catch (error) {
             showError(error.message);
             
-            // Vibrar error
             if ('vibrate' in navigator) {
                 navigator.vibrate([100, 50, 100]);
             }
@@ -431,7 +417,6 @@ async function initLogin() {
         }
     });
     
-    // Monitor de conexión
     updateConnectionStatus();
     window.addEventListener('online', updateConnectionStatus);
     window.addEventListener('offline', updateConnectionStatus);
@@ -443,21 +428,17 @@ async function initLogin() {
    UI - REGISTRO
    ======================================== */
 async function initRegister() {
-    console.log('📝 Inicializando página de registro...');
+    console.log('📝 Inicializando registro...');
     
-    // Redirigir si ya está autenticado
     if (isAuthenticated()) {
-        console.log('✅ Usuario ya autenticado, redirigiendo...');
+        console.log('✅ Usuario autenticado, redirigiendo...');
         window.location.href = 'home.html';
         return;
     }
     
-    // Esperar a que se inicialicen las dependencias
     await waitForDependencies();
     
-    // Configurar formulario
     const form = document.getElementById('registerForm');
-    const errorMessage = document.getElementById('errorMessage');
     const btnRegister = document.getElementById('btnRegister');
     
     form.addEventListener('submit', async (e) => {
@@ -468,37 +449,29 @@ async function initRegister() {
         const password = document.getElementById('password').value;
         const confirmPassword = document.getElementById('confirmPassword').value;
         
-        // Limpiar error previo
         hideError();
         
-        // Validar contraseñas coincidan
         if (password !== confirmPassword) {
             showError('Las contraseñas no coinciden');
             return;
         }
         
-        // Deshabilitar botón
         btnRegister.disabled = true;
         btnRegister.textContent = 'Creando cuenta...';
         
         try {
             await registerUser(name, email, password);
             
-            // Vibrar éxito
             if ('vibrate' in navigator) {
                 navigator.vibrate(200);
             }
             
-            // Mostrar mensaje de éxito
-            alert('✅ Cuenta creada exitosamente\n\nAhora inicia sesión con tus credenciales');
-            
-            // Redirigir a login
+            alert('✅ Cuenta creada exitosamente\n\nAhora inicia sesión');
             window.location.href = 'login.html';
             
         } catch (error) {
             showError(error.message);
             
-            // Vibrar error
             if ('vibrate' in navigator) {
                 navigator.vibrate([100, 50, 100]);
             }
@@ -508,7 +481,6 @@ async function initRegister() {
         }
     });
     
-    // Monitor de conexión
     updateConnectionStatus();
     window.addEventListener('online', updateConnectionStatus);
     window.addEventListener('offline', updateConnectionStatus);
@@ -517,14 +489,9 @@ async function initRegister() {
 }
 
 /* ========================================
-   Utilidades de UI
+   UI Helpers
    ======================================== */
 function showError(message) {
-    if (window.UI && typeof window.UI.showError === 'function') {
-        window.UI.showError(message);
-        return;
-    }
-
     const errorDiv = document.getElementById('errorMessage');
     if (errorDiv) {
         errorDiv.textContent = message;
@@ -549,45 +516,35 @@ function updateConnectionStatus() {
         statusText.textContent = 'Conectado';
         statusDot.classList.remove('offline');
     } else {
-        statusText.textContent = 'Sin conexión';
+        statusText.textContent = 'Sin conexión (puedes iniciar sesión con cuenta existente)';
         statusDot.classList.add('offline');
     }
 }
 
 async function waitForDependencies() {
-    console.log('⏳ Esperando dependencias...');
+    console.log('⏳ Esperando IndexedDB...');
     
     let attempts = 0;
-    const maxAttempts = 30; // 6 segundos máximo
+    const maxAttempts = 30;
     
     while (attempts < maxAttempts) {
-        // Verificar IndexedDB
-        const hasDB = window.DB && typeof window.DB.init === 'function';
-        
-        // Verificar Firebase
-        const hasFirebase = window.FirebaseDB && window.FirebaseDB.db;
-        
-        if (hasDB) {
+        if (window.DB && typeof window.DB.init === 'function') {
             console.log('✅ IndexedDB disponible');
             
-            if (!hasFirebase) {
-                console.warn('⚠️ Firebase no disponible (trabajando en modo offline)');
-            } else {
-                console.log('✅ Firebase disponible');
-            }
-            
-            return; // Al menos IndexedDB está listo
+            // Inicializar
+            await window.DB.init();
+            return;
         }
         
         await new Promise(resolve => setTimeout(resolve, 200));
         attempts++;
     }
     
-    console.warn('⚠️ Timeout esperando dependencias');
+    console.warn('⚠️ Timeout esperando IndexedDB');
 }
 
 /* ========================================
-   Exportar funciones
+   Exportar
    ======================================== */
 window.Auth = {
     login: loginUser,
@@ -616,4 +573,4 @@ if (document.readyState === 'loading') {
     }
 }
 
-console.log('✅ auth.js cargado');
+console.log('✅ auth.js cargado (OFFLINE FIRST)');

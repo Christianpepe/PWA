@@ -17,7 +17,9 @@
         <div class="auth-card">
             <!-- Logo -->
             <div class="auth-logo">
-                <img src="img/logo.png" alt="SafeProducts logo" class="auth-logo-img">
+                <div style="width:80px;height:80px;background:#2563eb;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                    <span style="font-size:2rem;font-weight:700;color:white;">SP</span>
+                </div>
                 <h1>SafeProducts</h1>
             </div>
 
@@ -102,12 +104,11 @@
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts en ORDEN CORRECTO -->
+    <script src="js/offline-handler.js"></script>
     <script src="js/db.js"></script>
-    <script src="js/ui.js"></script>
     <script type="module" src="js/firebase-config.js"></script>
     <script src="js/sync.js"></script>
     <script src="js/auth.js"></script>
-    <script src="js/auth-ui.js"></script>
 </body>
 </html>

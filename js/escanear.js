@@ -1,6 +1,6 @@
 /* ========================================
-   escanear.js - Lógica de Escaneo QR
-   Leer códigos QR y mostrar productos
+   escanear.js - CORREGIDO PARA OFFLINE
+   Escaneo QR que funciona sin conexión
    ======================================== */
 
 let video = null;
@@ -10,47 +10,47 @@ let scannerActive = false;
 let currentProduct = null;
 let scanTimeout = null;
 
-/* ========================================
-   Inicialización
-   ======================================== */
 async function initScanner() {
     try {
         console.log('📱 Inicializando módulo de escaneo...');
         
-        // VERIFICAR AUTENTICACIÓN
+        // Verificar autenticación
         if (!isUserAuthenticated()) {
-            console.log('❌ Usuario no autenticado, redirigiendo...');
+            console.log('❌ Usuario no autenticado');
             window.location.href = 'login.html';
             return;
         }
         
-        // Inicializar sistema de sincronización
-        await window.SyncDB.init();
+        // CRÍTICO: Inicializar sistema local (no esperar Firebase)
+        try {
+            await window.SyncDB.init();
+            console.log('✅ Sistema local inicializado');
+        } catch (error) {
+            console.warn('⚠️ Error inicializando:', error);
+        }
         
-        // Obtener elementos del DOM
+        // Elementos DOM
         video = document.getElementById('video');
         canvasElement = document.createElement('canvas');
         canvas = canvasElement.getContext('2d');
         
-        // Setup event listeners
         setupEventListeners();
         
-        console.log('✅ Módulo de escaneo listo');
+        console.log('✅ Escáner listo (funciona offline)');
         
     } catch (error) {
-        console.error('❌ Error al inicializar escaneo:', error);
+        console.error('❌ Error:', error);
         showError('Error al inicializar el escáner');
     }
 }
 
 /* ========================================
-   Gestión de Cámara
+   Cámara
    ======================================== */
 async function startScanner() {
     try {
         console.log('📷 Iniciando cámara...');
         
-        // Solicitar acceso a la cámara
         const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment' },
             audio: false
@@ -60,17 +60,15 @@ async function startScanner() {
         video.play();
         
         scannerActive = true;
-        
         console.log('✅ Cámara iniciada');
         
-        // Comenzar a escanear
         scan();
         
     } catch (error) {
-        console.error('❌ Error al acceder a cámara:', error);
+        console.error('❌ Error:', error);
         
         if (error.name === 'NotAllowedError') {
-            showError('Permiso denegado. Habilita el acceso a la cámara en la configuración.');
+            showError('Permiso denegado. Habilita el acceso a la cámara.');
         } else if (error.name === 'NotFoundError') {
             showError('No se encontró cámara en este dispositivo.');
         } else {
@@ -94,13 +92,12 @@ function stopScanner() {
 }
 
 /* ========================================
-   Escaneo de Códigos QR
+   Escaneo
    ======================================== */
 function scan() {
     if (!scannerActive) return;
     
     try {
-        // Obtener frame de video
         canvasElement.width = video.videoWidth;
         canvasElement.height = video.videoHeight;
         
@@ -109,30 +106,32 @@ function scan() {
         const imageData = canvas.getImageData(0, 0, video.videoWidth, video.videoHeight);
         
         // Escanear código QR
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: 'dontInvert',
-        });
-        
-        if (code) {
-            console.log('✅ Código QR detectado:', code.data);
-            stopScanner();
-            searchByQRCode(code.data);
+        if (typeof jsQR !== 'undefined') {
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert',
+            });
+            
+            if (code) {
+                console.log('✅ QR detectado:', code.data);
+                stopScanner();
+                searchByQRCode(code.data);
+            }
+        } else {
+            console.warn('⚠️ Librería jsQR no cargada');
         }
         
     } catch (error) {
         console.error('Error en escaneo:', error);
     }
     
-    // Continuar escaneando
     scanTimeout = requestAnimationFrame(scan);
 }
 
 /* ========================================
-   Búsqueda de Productos
+   Búsqueda - SIEMPRE LOCAL
    ======================================== */
 async function searchByQRCode(qrCode = null) {
     try {
-        // Si no hay código, obtenerlo del input manual
         if (!qrCode) {
             qrCode = document.getElementById('manualQRCode').value.trim();
             if (!qrCode) {
@@ -142,9 +141,9 @@ async function searchByQRCode(qrCode = null) {
             closeManualModal();
         }
         
-        console.log('🔍 Buscando producto con QR:', qrCode);
+        console.log('🔍 Buscando QR:', qrCode);
         
-        // Buscar en IndexedDB
+        // CRÍTICO: Buscar SIEMPRE en IndexedDB local
         const product = await window.SyncDB.getProductByQR(qrCode);
         
         if (product) {
@@ -159,7 +158,7 @@ async function searchByQRCode(qrCode = null) {
         }
         
     } catch (error) {
-        console.error('❌ Error al buscar producto:', error);
+        console.error('❌ Error:', error);
         showError('Error al buscar el producto');
     }
 }
@@ -169,7 +168,6 @@ async function searchByQRCode(qrCode = null) {
    ======================================== */
 function displayProduct(product) {
     try {
-        // Mostrar resultado
         const resultContainer = document.getElementById('resultContainer');
         const productResult = document.getElementById('productResult');
         const emptyState = document.getElementById('emptyState');
@@ -178,7 +176,6 @@ function displayProduct(product) {
         productResult.classList.remove('hidden');
         emptyState.classList.add('hidden');
         
-        // Llenar datos
         document.getElementById('resultName').textContent = product.name;
         document.getElementById('resultCategory').textContent = product.category;
         document.getElementById('resultCategoryFull').textContent = product.category;
@@ -186,7 +183,6 @@ function displayProduct(product) {
         document.getElementById('resultQR').textContent = product.qrCode;
         document.getElementById('resultStock').textContent = product.quantity;
         
-        // Descripción
         const descElement = document.getElementById('resultDescription');
         if (product.description) {
             descElement.textContent = product.description;
@@ -195,7 +191,6 @@ function displayProduct(product) {
             descElement.classList.add('hidden');
         }
         
-        // Indicador de stock
         const stockIndicator = document.getElementById('stockIndicator');
         if (product.quantity < 5) {
             stockIndicator.className = 'stock-indicator critical';
@@ -205,48 +200,42 @@ function displayProduct(product) {
             stockIndicator.className = 'stock-indicator';
         }
         
-        // Fecha actualización
         const updatedDate = new Date(product.updatedAt);
         document.getElementById('resultUpdated').textContent = updatedDate.toLocaleDateString('es-MX');
         
-        console.log('✅ Producto mostrado en pantalla');
+        console.log('✅ Producto mostrado');
         
     } catch (error) {
-        console.error('Error al mostrar producto:', error);
+        console.error('Error mostrando producto:', error);
         showError('Error al mostrar el producto');
     }
 }
 
 /* ========================================
-   Mensajes
+   UI
    ======================================== */
 function showError(message) {
-    // Use global UI helper if available
-    if (window.UI && typeof window.UI.showError === 'function') {
-        window.UI.showError(message);
-        return;
-    }
-
-    const errorElement = document.getElementById('errorMessage');
-    if (errorElement) {
-        errorElement.textContent = message;
-        errorElement.classList.remove('hidden');
-        setTimeout(() => errorElement.classList.add('hidden'), 5000);
-    }
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position:fixed;top:20px;right:20px;background:#ef4444;color:white;
+        padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);
+        z-index:10000;animation:slideIn 0.3s ease-out;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
 }
 
 function showSuccess(message) {
-    if (window.UI && typeof window.UI.showSuccess === 'function') {
-        window.UI.showSuccess(message);
-        return;
-    }
-
-    const successElement = document.getElementById('successMessage');
-    if (successElement) {
-        successElement.textContent = message;
-        successElement.classList.remove('hidden');
-        setTimeout(() => successElement.classList.add('hidden'), 3000);
-    }
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position:fixed;top:20px;right:20px;background:#10b981;color:white;
+        padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);
+        z-index:10000;animation:slideIn 0.3s ease-out;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
 }
 
 function showEmptyState() {
@@ -259,9 +248,6 @@ function showEmptyState() {
     emptyState.classList.remove('hidden');
 }
 
-/* ========================================
-   Modal Manual
-   ======================================== */
 function openManualModal() {
     document.getElementById('manualInputModal').classList.remove('hidden');
     document.getElementById('manualQRCode').focus();
@@ -272,61 +258,42 @@ function closeManualModal() {
     document.getElementById('manualQRCode').value = '';
 }
 
-/* ========================================
-   Editar Producto
-   ======================================== */
 function editProduct() {
     if (!currentProduct) {
         showError('No hay producto seleccionado');
         return;
     }
     
-    // Redirigir a productos.html con el ID del producto
-    const productId = currentProduct.id;
-    window.location.href = `productos.html?edit=${productId}`;
+    window.location.href = `productos.html?edit=${currentProduct.id}`;
 }
 
-/* ========================================
-   Nuevo Escaneo
-   ======================================== */
 function newScan() {
     currentProduct = null;
     document.getElementById('manualQRCode').value = '';
     showEmptyState();
-    clearMessages();
     
-    // Iniciar cámara de nuevo
     if (!scannerActive) {
         startScanner();
     }
-}
-
-function clearMessages() {
-    document.getElementById('errorMessage').classList.add('hidden');
-    document.getElementById('successMessage').classList.add('hidden');
 }
 
 /* ========================================
    Event Listeners
    ======================================== */
 function setupEventListeners() {
-    // Botones de control
     document.getElementById('btnStartScanner').addEventListener('click', startScanner);
     document.getElementById('btnStopScanner').addEventListener('click', stopScanner);
     document.getElementById('btnManualInput').addEventListener('click', openManualModal);
     
-    // Botones de resultado
     document.getElementById('btnEditProduct').addEventListener('click', editProduct);
     document.getElementById('btnNewScan').addEventListener('click', newScan);
     
-    // Modal manual
     document.getElementById('manualInputModal').addEventListener('click', (e) => {
         if (e.target.id === 'manualInputModal') {
             closeManualModal();
         }
     });
     
-    // Enter en input manual
     document.getElementById('manualQRCode').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             searchByQRCode();
@@ -334,9 +301,6 @@ function setupEventListeners() {
     });
 }
 
-/* ========================================
-   Utilidades
-   ======================================== */
 function formatPrice(price) {
     return price.toLocaleString('es-MX', {
         minimumFractionDigits: 2,
@@ -353,9 +317,8 @@ if (document.readyState === 'loading') {
     initScanner();
 }
 
-// Limpiar al salir
 window.addEventListener('beforeunload', () => {
     stopScanner();
 });
 
-console.log('✅ escanear.js cargado');
+console.log('✅ escanear.js cargado (OFFLINE FIRST)');

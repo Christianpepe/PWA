@@ -1,97 +1,92 @@
 /* ========================================
-   productos.js - CORREGIDO
-   Ahora descarga productos de Firebase al iniciar
+   productos.js - CORREGIDO PARA OFFLINE
+   Ya NO espera a Firebase para funcionar
    ======================================== */
 
 let currentProductId = null;
 let allProducts = [];
 let categories = [];
 
-/* ========================================
-   Inicialización - CORREGIDA
-   ======================================== */
 async function initProductos() {
     try {
         console.log('🛒 Inicializando módulo de productos...');
         
         // VERIFICAR AUTENTICACIÓN
         if (!isUserAuthenticated()) {
-            console.log('❌ Usuario no autenticado, redirigiendo...');
+            console.log('❌ Usuario no autenticado');
             window.location.href = 'login.html';
             return;
         }
         
-        // Mostrar indicador de carga
         showLoadingIndicator();
         
-        // 0. Esperar a que Firebase esté listo
-        console.log('⏳ Esperando que Firebase esté disponible...');
-        let attempt = 0;
-        while (!window.FirebaseDB && attempt < 50) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempt++;
-        }
-        
-        if (!window.FirebaseDB) {
-            console.warn('⚠️ Firebase no se inicializó correctamente');
-        } else {
-            console.log('✅ Firebase disponible');
-        }
-        
-        // 1. Inicializar sistema de sincronización híbrido
+        // 1. INICIALIZAR SISTEMA LOCAL (NO ESPERAR A FIREBASE)
+        console.log('📦 Inicializando sistema local...');
         await window.SyncDB.init();
         
-        // 2. 🔥 NUEVO: Sincronizar desde Firebase PRIMERO
-        console.log('🔄 Sincronizando productos desde Firebase...');
-        
-        if (navigator.onLine && window.FirebaseDB) {
-            try {
-                await window.SyncDB.syncDown(); // Descargar de Firebase → IndexedDB
-                console.log('✅ Productos sincronizados desde Firebase');
-            } catch (error) {
-                console.warn('⚠️ No se pudo sincronizar desde Firebase:', error);
-                // Continuar con datos locales si hay error
-            }
-        } else {
-            console.log('📴 Sin conexión - Usando datos locales');
-        }
-        
-        // 3. Limpiar duplicados
-        if (typeof window.cleanIndexedDB === 'function') {
-            await window.cleanIndexedDB();
-        }
-        
-        // 4. Cargar categorías
+        // 2. CARGAR DATOS LOCALES INMEDIATAMENTE
+        console.log('📦 Cargando datos locales...');
         await loadCategories();
-        
-        // 5. Cargar productos (ahora ya descargados de Firebase)
         await loadProducts();
         
-        // 6. Setup event listeners
+        // 3. SINCRONIZAR EN BACKGROUND SOLO SI HAY CONEXIÓN
+        if (navigator.onLine) {
+            console.log('🌐 Sincronizando en background...');
+            syncInBackground();
+        } else {
+            console.log('📴 Offline - Trabajando solo con datos locales');
+        }
+        
+        // 4. SETUP
         setupEventListeners();
         
-        // 7. Verificar si viene del escaneo
+        // 5. VERIFICAR URL PARAMS
         const urlParams = new URLSearchParams(window.location.search);
         const editId = urlParams.get('edit');
         if (editId) {
-            const productId = parseInt(editId);
-            editProduct(productId);
+            editProduct(parseInt(editId));
         }
         
-        // Ocultar indicador de carga
         hideLoadingIndicator();
-        
-        console.log('✅ Módulo de productos listo (Con sincronización Firebase)');
+        console.log('✅ Módulo de productos listo');
         
     } catch (error) {
-        console.error('❌ Error al inicializar productos:', error);
+        console.error('❌ Error:', error);
         hideLoadingIndicator();
-        showError('Error al cargar productos. Intenta recargar la página.');
+        showError('Error al cargar. La app seguirá funcionando offline.');
     }
 }
 
 /* ========================================
-   Indicadores de Carga
+   Sincronización en Background
+   ======================================== */
+async function syncInBackground() {
+    try {
+        // No bloquear la UI
+        setTimeout(async () => {
+            console.log('🔄 Sincronizando...');
+            
+            // Subir cambios locales
+            await window.SyncDB.syncUp();
+            
+            // Descargar cambios remotos
+            await window.SyncDB.syncDown();
+            
+            // Recargar productos
+            await loadProducts();
+            
+            console.log('✅ Sincronización en background completada');
+            
+        }, 1000); // Delay de 1 segundo
+        
+    } catch (error) {
+        console.warn('⚠️ Error en sincronización background:', error);
+        // No mostrar error al usuario, seguir trabajando offline
+    }
+}
+
+/* ========================================
+   UI Helpers
    ======================================== */
 function showLoadingIndicator() {
     if (window.UI && typeof window.UI.showLoadingIndicator === 'function') {
@@ -99,17 +94,21 @@ function showLoadingIndicator() {
         return;
     }
 
-    // Fallback: create a loading indicator element (uses CSS .spinner)
     if (document.getElementById('loadingIndicator')) return;
+    
     const indicator = document.createElement('div');
     indicator.id = 'loadingIndicator';
-    indicator.setAttribute('role', 'status');
-    indicator.setAttribute('aria-live', 'polite');
     indicator.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:center;gap:.5rem;">
-            <div class="spinner" aria-hidden="true"></div>
-            <span>Sincronizando productos...</span>
+        <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                    background:white;padding:20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);
+                    display:flex;align-items:center;gap:12px;z-index:10000;">
+            <div class="spinner" style="width:24px;height:24px;border:3px solid #e5e7eb;
+                border-top-color:#2563eb;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+            <span style="font-weight:500;color:#374151;">Cargando productos...</span>
         </div>
+        <style>
+            @keyframes spin { to { transform: rotate(360deg); } }
+        </style>
     `;
     document.body.appendChild(indicator);
 }
@@ -125,45 +124,38 @@ function hideLoadingIndicator() {
 }
 
 function showError(message) {
-    if (window.UI && typeof window.UI.showError === 'function') {
-        window.UI.showError(message);
-        return;
-    }
-
     const toast = document.createElement('div');
-    toast.className = 'toast error-toast';
-    toast.setAttribute('role', 'alert');
+    toast.style.cssText = `
+        position:fixed;top:20px;right:20px;background:#ef4444;color:white;
+        padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);
+        z-index:10000;animation:slideIn 0.3s ease-out;
+    `;
     toast.textContent = message;
     document.body.appendChild(toast);
 
-    setTimeout(() => toast.classList.add('fade-out'), 320);
-    setTimeout(() => toast.remove(), 6000);
+    setTimeout(() => toast.remove(), 5000);
 }
 
 function showSuccess(message) {
-    if (window.UI && typeof window.UI.showSuccess === 'function') {
-        window.UI.showSuccess(message);
-        return;
-    }
-
     const toast = document.createElement('div');
-    toast.className = 'toast toast-success';
-    toast.setAttribute('role', 'status');
+    toast.style.cssText = `
+        position:fixed;top:20px;right:20px;background:#10b981;color:white;
+        padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);
+        z-index:10000;animation:slideIn 0.3s ease-out;
+    `;
     toast.textContent = message;
     document.body.appendChild(toast);
 
-    setTimeout(() => toast.classList.add('fade-out'), 320);
-    setTimeout(() => toast.remove(), 3600);
+    setTimeout(() => toast.remove(), 3000);
 }
 
 /* ========================================
-   Cargar Datos
+   Cargar Datos - SIEMPRE LOCAL
    ======================================== */
 async function loadCategories() {
     try {
         categories = await window.SyncDB.getAllCategories();
         
-        // Llenar selects de categorías
         const selects = [
             document.getElementById('productCategory'),
             document.getElementById('filterCategory')
@@ -172,12 +164,10 @@ async function loadCategories() {
         selects.forEach(select => {
             if (!select) return;
             
-            // Limpiar opciones existentes (excepto la primera)
             while (select.options.length > 1) {
                 select.remove(1);
             }
             
-            // Agregar categorías
             categories.forEach(cat => {
                 const option = document.createElement('option');
                 option.value = cat.name;
@@ -197,16 +187,15 @@ async function loadProducts(filter = '') {
     try {
         console.log('📦 Cargando productos...');
         
-        // Obtener productos según filtro (ya están sincronizados)
+        // SIEMPRE obtener de IndexedDB local
         if (filter) {
             allProducts = await window.SyncDB.filterByCategory(filter);
         } else {
             allProducts = await window.SyncDB.getAllProducts();
         }
         
-        console.log(`📦 ${allProducts.length} productos cargados`);
+        console.log(`📦 ${allProducts.length} productos cargados (local)`);
         
-        // Renderizar
         renderProducts(allProducts);
         updateProductCount(allProducts.length);
         
@@ -228,10 +217,9 @@ function renderProducts(products) {
         return;
     }
     
-    // Ocultar empty state
     if (emptyState) emptyState.classList.add('hidden');
     
-    // Eliminar duplicados por ID
+    // Eliminar duplicados
     const uniqueProducts = [];
     const seenIds = new Set();
     
@@ -241,28 +229,23 @@ function renderProducts(products) {
         if (!seenIds.has(uniqueId)) {
             seenIds.add(uniqueId);
             uniqueProducts.push(product);
-        } else {
-            console.warn('⚠️ Producto duplicado detectado (ignorado):', product.name);
         }
     });
     
     console.log(`📊 Renderizando ${uniqueProducts.length} productos únicos`);
     
-    // Renderizar productos únicos
     container.innerHTML = uniqueProducts.map(product => createProductCard(product)).join('');
     
-    // Agregar event listeners a las tarjetas
+    // Event listeners
     container.querySelectorAll('.product-card').forEach(card => {
         const id = parseInt(card.dataset.id);
         
-        // Click en tarjeta = ver detalles
         card.addEventListener('click', (e) => {
             if (!e.target.closest('.product-actions')) {
                 viewProductDetails(id);
             }
         });
         
-        // Botón editar
         const btnEdit = card.querySelector('.btn-edit');
         if (btnEdit) {
             btnEdit.addEventListener('click', (e) => {
@@ -271,7 +254,6 @@ function renderProducts(products) {
             });
         }
         
-        // Botón eliminar
         const btnDelete = card.querySelector('.btn-delete');
         if (btnDelete) {
             btnDelete.addEventListener('click', (e) => {
@@ -286,7 +268,6 @@ function createProductCard(product) {
     const category = categories.find(c => c.name === product.category);
     const categoryColor = category ? category.color : '#6b7280';
     
-    // Determinar clase de stock
     let stockClass = 'stock-high';
     if (product.quantity < 5) {
         stockClass = 'stock-low';
@@ -349,7 +330,7 @@ function updateProductCount(count) {
 }
 
 /* ========================================
-   Modal: Agregar/Editar
+   Modal y CRUD
    ======================================== */
 function openAddModal() {
     currentProductId = null;
@@ -360,10 +341,8 @@ function openAddModal() {
     document.getElementById('productQR').value = '';
     
     document.getElementById('productModal').classList.remove('hidden');
-    // Lock background scroll when modal is open
     document.body.classList.add('modal-open');
     
-    // Vibrar
     if ('vibrate' in navigator) {
         navigator.vibrate(50);
     }
@@ -380,7 +359,6 @@ async function editProduct(id) {
         
         currentProductId = id;
         
-        // Llenar formulario
         document.getElementById('modalTitle').textContent = 'Editar Producto';
         document.getElementById('productId').value = product.id;
         document.getElementById('productName').value = product.name;
@@ -392,13 +370,12 @@ async function editProduct(id) {
         
         document.getElementById('productModal').classList.remove('hidden');
         
-        // Vibrar
         if ('vibrate' in navigator) {
             navigator.vibrate(50);
         }
         
     } catch (error) {
-        console.error('Error al editar producto:', error);
+        console.error('Error al editar:', error);
         alert('Error al cargar producto');
     }
 }
@@ -409,9 +386,6 @@ function closeModal() {
     document.body.classList.remove('modal-open');
 }
 
-/* ========================================
-   Guardar Producto
-   ======================================== */
 async function saveProduct(event) {
     event.preventDefault();
     
@@ -428,7 +402,6 @@ async function saveProduct(event) {
             category: document.getElementById('productCategory').value
         };
         
-        // Validaciones
         if (!productData.name || !productData.category) {
             alert('Por favor completa los campos requeridos');
             return;
@@ -439,35 +412,29 @@ async function saveProduct(event) {
             return;
         }
         
-        // Guardar
         if (currentProductId) {
-            // Actualizar
             await window.SyncDB.updateProduct(currentProductId, productData);
-            console.log('✅ Producto actualizado:', currentProductId);
+            console.log('✅ Producto actualizado');
+            showSuccess('Producto actualizado correctamente');
             
-            // Vibrar
             if ('vibrate' in navigator) {
                 navigator.vibrate([50, 50, 50]);
             }
         } else {
-            // Crear nuevo
-            const id = await window.SyncDB.addProduct(productData);
-            console.log('✅ Producto creado:', id);
+            await window.SyncDB.addProduct(productData);
+            console.log('✅ Producto creado');
+            showSuccess('Producto agregado correctamente');
             
-            // Vibrar
             if ('vibrate' in navigator) {
                 navigator.vibrate(200);
             }
         }
         
-        // Recargar lista
         await loadProducts();
-        
-        // Cerrar modal
         closeModal();
         
     } catch (error) {
-        console.error('Error al guardar producto:', error);
+        console.error('Error al guardar:', error);
         alert('Error al guardar. ' + error.message);
     } finally {
         btnSave.disabled = false;
@@ -475,9 +442,6 @@ async function saveProduct(event) {
     }
 }
 
-/* ========================================
-   Eliminar Producto
-   ======================================== */
 async function deleteProduct(id) {
     try {
         const product = await window.SyncDB.getProductById(id);
@@ -494,25 +458,21 @@ async function deleteProduct(id) {
         if (!confirmed) return;
         
         await window.SyncDB.deleteProduct(id);
-        console.log('✅ Producto eliminado:', id);
+        console.log('✅ Producto eliminado');
+        showSuccess('Producto eliminado correctamente');
         
-        // Vibrar
         if ('vibrate' in navigator) {
             navigator.vibrate([100, 50, 100]);
         }
         
-        // Recargar lista
         await loadProducts();
         
     } catch (error) {
-        console.error('Error al eliminar producto:', error);
+        console.error('Error al eliminar:', error);
         alert('Error al eliminar producto');
     }
 }
 
-/* ========================================
-   Ver Detalles
-   ======================================== */
 async function viewProductDetails(id) {
     try {
         const product = await window.SyncDB.getProductById(id);
@@ -522,7 +482,6 @@ async function viewProductDetails(id) {
             return;
         }
         
-        // Llenar modal de detalles
         document.getElementById('detailName').textContent = product.name;
         document.getElementById('detailDescription').textContent = product.description || 'Sin descripción';
         document.getElementById('detailPrice').textContent = '$' + formatPrice(product.price);
@@ -530,7 +489,6 @@ async function viewProductDetails(id) {
         document.getElementById('detailCategory').textContent = product.category;
         document.getElementById('detailQR').textContent = product.qrCode;
         
-        // Generar código QR
         const qrContainer = document.getElementById('qrContainer');
         qrContainer.innerHTML = '';
         
@@ -547,17 +505,14 @@ async function viewProductDetails(id) {
             qrContainer.innerHTML = '<p>Librería QR no disponible</p>';
         }
         
-        // Botón editar desde detalles
         document.getElementById('btnEditFromDetails').onclick = () => {
             closeDetailsModal();
             editProduct(id);
         };
         
-        // Mostrar modal
         document.getElementById('detailsModal').classList.remove('hidden');
         document.body.classList.add('modal-open');
         
-        // Vibrar
         if ('vibrate' in navigator) {
             navigator.vibrate(50);
         }
@@ -587,11 +542,9 @@ function setupSearch() {
             const query = e.target.value.trim();
             
             if (query.length === 0) {
-                // Mostrar todos
                 renderProducts(allProducts);
                 updateProductCount(allProducts.length);
             } else if (query.length >= 2) {
-                // Buscar
                 const results = await window.SyncDB.searchProducts(query);
                 renderProducts(results);
                 updateProductCount(results.length);
@@ -609,45 +562,33 @@ function setupCategoryFilter() {
     });
 }
 
-/* ========================================
-   Event Listeners
-   ======================================== */
 function setupEventListeners() {
-    // Botón agregar producto
     const btnAdd = document.getElementById('btnAddProduct');
     if (btnAdd) {
         btnAdd.addEventListener('click', openAddModal);
     }
     
-    // Formulario de producto
     const form = document.getElementById('productForm');
     if (form) {
         form.addEventListener('submit', saveProduct);
     }
     
-    // Búsqueda
     setupSearch();
-    
-    // Filtro de categoría
     setupCategoryFilter();
     
-    // Click fuera del modal para cerrar
-    document.getElementById('productModal').addEventListener('click', (e) => {
+    document.getElementById('productModal')?.addEventListener('click', (e) => {
         if (e.target.id === 'productModal') {
             closeModal();
         }
     });
     
-    document.getElementById('detailsModal').addEventListener('click', (e) => {
+    document.getElementById('detailsModal')?.addEventListener('click', (e) => {
         if (e.target.id === 'detailsModal') {
             closeDetailsModal();
         }
     });
 }
 
-/* ========================================
-   Utilidades
-   ======================================== */
 function formatPrice(price) {
     return price.toLocaleString('es-MX', {
         minimumFractionDigits: 2,
@@ -661,13 +602,10 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-/* ========================================
-   Auto-inicialización
-   ======================================== */
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initProductos);
 } else {
     initProductos();
 }
 
-console.log('✅ productos.js cargado (Con sincronización automática)');
+console.log('✅ productos.js cargado (OFFLINE FIRST)');
